@@ -13,6 +13,7 @@ import {
   Clock,
   Heart,
   RefreshCw,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -26,6 +27,7 @@ import {
   PRIORIDADE_STYLE,
   type VisitanteFluxo,
 } from "@/lib/visitantesFluxo";
+import { avaliarEvolucao } from "@/lib/evolucaoFluxo";
 import type { Membro } from "@/pages/Membros";
 
 // ── Interfaces ───────────────────────────────────────────────────────────────
@@ -38,7 +40,7 @@ interface RawMembro extends Membro {
   created_at:                  string;
 }
 
-/** Extensão local de VisitanteFluxo com campos de histórico de contato */
+/** Extensão local de VisitanteFluxo com campos de histórico e evolução */
 interface VisitanteFluxoExt extends VisitanteFluxo {
   ultimo_contato_tipo:        string | null;
   ultimo_contato_observacao:  string | null;
@@ -200,12 +202,17 @@ export default function AcoesHoje({ limit }: AcoesHojeProps = {}) {
       ) : (
         <div className="grid gap-3">
           {visitantes.map((v) => {
-            const prio = PRIORIDADE_STYLE[v.prioridade];
-            const msg  = getMensagem(v.etapa_fluxo, v.nome_completo);
-            const link = buildWhatsAppLink(v.telefone, msg);
-            const busy = busyId === v.id;
+            const prio     = PRIORIDADE_STYLE[v.prioridade];
+            const msg      = getMensagem(v.etapa_fluxo, v.nome_completo);
+            const link     = buildWhatsAppLink(v.telefone, msg);
+            const busy     = busyId === v.id;
+            const evolucao = avaliarEvolucao({
+              tipo_pessoa:         v.status_acolhimento ? "visitante" : "visitante",
+              numero_visitas:      v.numero_visitas,
+              ultimo_contato_tipo: v.ultimo_contato_tipo,
+              created_at:          v.created_at,
+            });
 
-            // Contexto de último contato
             const ultimoContato = v.ultimo_contato_em
               ? `${new Date(v.ultimo_contato_em).toLocaleDateString("pt-BR")}${v.ultimo_contato_tipo ? ` — ${v.ultimo_contato_tipo}` : ""}`
               : null;
@@ -225,7 +232,7 @@ export default function AcoesHoje({ limit }: AcoesHojeProps = {}) {
 
                     <div className="flex-1 min-w-0 space-y-2">
 
-                      {/* Nome + badges */}
+                      {/* Nome + badges de prioridade */}
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-medium leading-tight">{v.nome_completo}</span>
                         <Badge
@@ -238,6 +245,13 @@ export default function AcoesHoje({ limit }: AcoesHojeProps = {}) {
                         <Badge variant="outline" className="text-[10px] h-4 px-1.5">
                           {ETAPA_LABEL[v.etapa_fluxo]}
                         </Badge>
+                        {/* Badge de evolução — informativo */}
+                        {evolucao.sugestao && (
+                          <Badge className="text-[10px] h-4 px-1.5 gap-1 bg-success/15 text-success border border-success/30 hover:bg-success/15">
+                            <TrendingUp className="w-2.5 h-2.5" />
+                            Pronto para {evolucao.proximo}
+                          </Badge>
+                        )}
                       </div>
 
                       {/* Meta — dias, visitas, telefone */}

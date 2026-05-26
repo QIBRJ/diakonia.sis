@@ -19,21 +19,31 @@ import {
   calcularEtapa, calcularPrioridade, getMensagem,
   buildWhatsAppLink, getStatusPorEtapa, ETAPA_LABEL, PRIORIDADE_STYLE, precisaAcao,
 } from "@/lib/visitantesFluxo";
+import {
+  avaliarEvolucao,
+  ETAPAS_JORNADA,
+} from "@/lib/evolucaoFluxo";
+
+// ── Interfaces ────────────────────────────────────────────────────────────────
 
 interface VisitanteMembro extends Membro {
-  numero_visitas?: number | null;
-  ultimo_contato_em?: string | null;
-  created_at: string;
+  numero_visitas?:        number | null;
+  ultimo_contato_em?:     string | null;
+  ultimo_contato_tipo?:   string | null;
+  created_at:             string;
 }
 
 const DIAS_RETORNO = 15;
 
+// ── Componente principal ──────────────────────────────────────────────────────
+
 export default function Visitantes() {
-  const [visitantes, setVisitantes] = useState<VisitanteMembro[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
-  const [selected, setSelected]     = useState<VisitanteMembro | null>(null);
-  const [busyId, setBusyId]         = useState<string | null>(null);
+  const [visitantes, setVisitantes]   = useState<VisitanteMembro[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [selected, setSelected]       = useState<VisitanteMembro | null>(null);
+  const [busyId, setBusyId]           = useState<string | null>(null);
+  const [busyPromote, setBusyPromote] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -50,14 +60,24 @@ export default function Visitantes() {
 
   useEffect(() => { load(); }, []);
 
+  // ── Estatísticas ────────────────────────────────────────────────────────────
+
   const stats = useMemo(() => {
     const corte15 = new Date(Date.now() - DIAS_RETORNO * 86_400_000);
     const corte3  = new Date(Date.now() - 3 * 86_400_000);
     const retornaram      = visitantes.filter(v => (v.numero_visitas ?? 1) >= 2 && new Date(v.created_at) > corte15).length;
     const naoVoltaram     = visitantes.filter(v => (v.numero_visitas ?? 1) === 1 && new Date(v.created_at) < corte15).length;
-    const precisamContato = visitantes.filter(v => precisaAcao(v.ultimo_contato_em)).length;
-    const pendentesHoje   = visitantes.filter(v => precisaAcao(v.ultimo_contato_em) && new Date(v.created_at) < corte3).length;
-    return { total: visitantes.length, retornaram, naoVoltaram, precisamContato, pendentesHoje };
+    const precisamContato = visitantes.filter(v => precisaAcao(v.ultimo_contato_em ?? null)).length;
+    const pendentesHoje   = visitantes.filter(v => precisaAcao(v.ultimo_contato_em ?? null) && new Date(v.created_at) < corte3).length;
+    const prontosCrescer  = visitantes.filter(v =>
+      avaliarEvolucao({
+        tipo_pessoa:         v.tipo_pessoa,
+        numero_visitas:      v.numero_visitas ?? 1,
+        ultimo_contato_tipo: v.ultimo_contato_tipo ?? null,
+        created_at:          v.created_at,
+      }).sugestao !== null
+    ).length;
+    return { total: visitantes.length, retornaram, naoVoltaram, precisamContato, pendentesHoje, prontosCrescer };
   }, [visitantes]);
 
   const listaNaoVoltou = useMemo(
@@ -69,6 +89,8 @@ export default function Visitantes() {
     () => visitantes.filter(v => (v.numero_visitas ?? 1) >= 2 && new Date(v.created_at) > new Date(Date.now() - DIAS_RETORNO * 86_400_000)),
     [visitantes]
   );
+
+  // ── Ações ───────────────────────────────────────────────────────────────────
 
   const registrarRetorno = async (v: VisitanteMembro) => {
     setBusyId(v.id);
@@ -99,6 +121,24 @@ export default function Visitantes() {
     window.open(link, "_blank", "noopener,noreferrer");
   };
 
+  const promoverPessoa = async (v: VisitanteMembro, para: "congregado" | "membro") => {
+    setBusyPromote(v.id);
+    const { error } = await supabase
+      .from("membros")
+      .update({ tipo_pessoa: para } as any)
+      .eq("id", v.id);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      const label = para === "congregado" ? "Congregado" : "Membro";
+      toast.success(`${v.nome_completo.split(" ")[0]} promovido(a) para ${label}! 🎉`);
+      load();
+    }
+    setBusyPromote(null);
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <div>
       <PageHeader
@@ -114,31 +154,46 @@ export default function Visitantes() {
         }
       />
       <div className="p-4 md:p-8 space-y-6">
+
+        {/* Cards de estatísticas */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard icon={<UserPlus className="w-5 h-5" />} label="Total visitantes" value={stats.total} />
-          <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Retornaram (15d)" value={stats.retornaram} color="success" />
-          <StatCard icon={<AlertTriangle className="w-5 h-5" />} label="Nao voltaram" value={stats.naoVoltaram} color="warning" />
-          <StatCard icon={<Phone className="w-5 h-5" />} label="Precisam contato" value={stats.precisamContato} color={stats.precisamContato > 0 ? "warning" : undefined} />
+          <StatCard icon={<UserPlus className="w-5 h-5" />}    label="Total visitantes"    value={stats.total} />
+          <StatCard icon={<TrendingUp className="w-5 h-5" />}  label="Retornaram (15d)"    value={stats.retornaram}      color="success" />
+          <StatCard icon={<AlertTriangle className="w-5 h-5" />} label="Nao voltaram"      value={stats.naoVoltaram}     color="warning" />
+          <StatCard icon={<Phone className="w-5 h-5" />}       label="Precisam contato"    value={stats.precisamContato} color={stats.precisamContato > 0 ? "warning" : undefined} />
         </div>
 
+        {/* Banner de evolução pronta */}
+        {stats.prontosCrescer > 0 && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-success/30 bg-success/5 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-success shrink-0" />
+              <p className="text-sm font-medium text-success" translate="no">
+                <span className="font-bold">{stats.prontosCrescer}</span>{" "}
+                {stats.prontosCrescer === 1 ? "visitante pronto" : "visitantes prontos"} para avançar na jornada
+              </p>
+            </div>
+            <Badge className="shrink-0 bg-success/15 text-success border border-success/30 text-xs hover:bg-success/15" translate="no">
+              Ver abaixo
+            </Badge>
+          </div>
+        )}
+
+        {/* Abas */}
         <Tabs defaultValue="acao">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="acao" className="gap-1.5" translate="no">
               <Zap className="w-4 h-4" />
               Acao do dia
               {stats.pendentesHoje > 0 && (
-                <Badge className="ml-1 h-4 px-1.5 text-[10px]" variant="destructive">
-                  {stats.pendentesHoje}
-                </Badge>
+                <Badge className="ml-1 h-4 px-1.5 text-[10px]" variant="destructive">{stats.pendentesHoje}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="nao_voltou" className="gap-1.5" translate="no">
               <AlertTriangle className="w-4 h-4" />
               Nao voltaram
               {listaNaoVoltou.length > 0 && (
-                <Badge className="ml-1 h-4 px-1.5 text-[10px]" variant="outline">
-                  {listaNaoVoltou.length}
-                </Badge>
+                <Badge className="ml-1 h-4 px-1.5 text-[10px]" variant="outline">{listaNaoVoltou.length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="todos" className="gap-1.5" translate="no">
@@ -164,9 +219,11 @@ export default function Visitantes() {
             ) : (
               <div className="grid gap-3">
                 {listaNaoVoltou.map(v => (
-                  <VisitanteCard key={v.id} v={v} busy={busyId === v.id}
+                  <VisitanteCard key={v.id} v={v}
+                    busy={busyId === v.id} busyPromote={busyPromote === v.id}
                     onOpen={() => setSelected(v)} onRetorno={() => registrarRetorno(v)}
-                    onContato={() => marcarContato(v)} onWhatsApp={() => abrirWhatsApp(v)} />
+                    onContato={() => marcarContato(v)} onWhatsApp={() => abrirWhatsApp(v)}
+                    onPromover={(para) => promoverPessoa(v, para)} />
                 ))}
               </div>
             )}
@@ -189,9 +246,11 @@ export default function Visitantes() {
                     </h3>
                     <div className="grid gap-3">
                       {listaRetorno.map(v => (
-                        <VisitanteCard key={v.id} v={v} busy={busyId === v.id} variant="success"
+                        <VisitanteCard key={v.id} v={v} variant="success"
+                          busy={busyId === v.id} busyPromote={busyPromote === v.id}
                           onOpen={() => setSelected(v)} onRetorno={() => registrarRetorno(v)}
-                          onContato={() => marcarContato(v)} onWhatsApp={() => abrirWhatsApp(v)} />
+                          onContato={() => marcarContato(v)} onWhatsApp={() => abrirWhatsApp(v)}
+                          onPromover={(para) => promoverPessoa(v, para)} />
                       ))}
                     </div>
                   </section>
@@ -203,9 +262,11 @@ export default function Visitantes() {
                   </h3>
                   <div className="grid gap-3">
                     {visitantes.map(v => (
-                      <VisitanteCard key={v.id} v={v} busy={busyId === v.id}
+                      <VisitanteCard key={v.id} v={v}
+                        busy={busyId === v.id} busyPromote={busyPromote === v.id}
                         onOpen={() => setSelected(v)} onRetorno={() => registrarRetorno(v)}
-                        onContato={() => marcarContato(v)} onWhatsApp={() => abrirWhatsApp(v)} />
+                        onContato={() => marcarContato(v)} onWhatsApp={() => abrirWhatsApp(v)}
+                        onPromover={(para) => promoverPessoa(v, para)} />
                     ))}
                   </div>
                 </section>
@@ -225,6 +286,8 @@ export default function Visitantes() {
   );
 }
 
+// ── StatCard ──────────────────────────────────────────────────────────────────
+
 function StatCard({ icon, label, value, color }: {
   icon: React.ReactNode; label: string; value: number | string; color?: "success" | "warning";
 }) {
@@ -239,9 +302,49 @@ function StatCard({ icon, label, value, color }: {
   );
 }
 
-function VisitanteCard({ v, busy, variant, onOpen, onRetorno, onContato, onWhatsApp }: {
-  v: VisitanteMembro; busy: boolean; variant?: "success";
-  onOpen: () => void; onRetorno: () => void; onContato: () => void; onWhatsApp: () => void;
+// ── JornalBar — barra de progresso Visitante → Congregado → Membro ────────────
+
+function JornadaBar({ tipoPessoa, pronto }: { tipoPessoa: string; pronto: boolean }) {
+  const currentIdx = ETAPAS_JORNADA.findIndex((s) => s.key === tipoPessoa);
+  return (
+    <div className="flex items-center gap-0.5 mt-1">
+      {ETAPAS_JORNADA.map((s, i) => {
+        const isCurrent = i === currentIdx;
+        const isDone    = i < currentIdx;
+        const isNext    = i === currentIdx + 1 && pronto;
+        return (
+          <span key={s.key} className="flex items-center gap-0.5">
+            {i > 0 && (
+              <span className={`text-[10px] mx-0.5 ${isDone || isNext ? "text-muted-foreground" : "text-muted-foreground/30"}`}>→</span>
+            )}
+            <span className={[
+              "text-[10px] font-medium px-1.5 py-0.5 rounded-full border transition-colors",
+              isCurrent ? "bg-primary/10 text-primary border-primary/30" : "",
+              isDone    ? "bg-success/10 text-success border-success/30" : "",
+              isNext    ? "bg-success/15 text-success border-success/40 ring-1 ring-success/30" : "",
+              !isCurrent && !isDone && !isNext ? "text-muted-foreground/40 border-transparent" : "",
+            ].join(" ")}>
+              {isNext && "✨ "}{s.label}
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── VisitanteCard ─────────────────────────────────────────────────────────────
+
+function VisitanteCard({ v, busy, busyPromote, variant, onOpen, onRetorno, onContato, onWhatsApp, onPromover }: {
+  v:           VisitanteMembro;
+  busy:        boolean;
+  busyPromote: boolean;
+  variant?:    "success";
+  onOpen:      () => void;
+  onRetorno:   () => void;
+  onContato:   () => void;
+  onWhatsApp:  () => void;
+  onPromover:  (para: "congregado" | "membro") => void;
 }) {
   const nv        = v.numero_visitas ?? 1;
   const etapa     = calcularEtapa(nv, v.created_at);
@@ -249,34 +352,90 @@ function VisitanteCard({ v, busy, variant, onOpen, onRetorno, onContato, onWhats
   const prioStyle = PRIORIDADE_STYLE[prio];
   const dias      = Math.floor((Date.now() - new Date(v.created_at).getTime()) / 86_400_000);
   const iconBg    = variant === "success" ? "bg-success/15 text-success" : "bg-warning/15 text-warning";
+
+  const evolucao = avaliarEvolucao({
+    tipo_pessoa:         v.tipo_pessoa,
+    numero_visitas:      nv,
+    ultimo_contato_tipo: v.ultimo_contato_tipo ?? null,
+    created_at:          v.created_at,
+  });
+
   return (
     <Card className={`shadow-card-soft hover:shadow-elevated transition-shadow border-l-4 ${prioStyle.border}`}>
-      <CardContent className="p-4 flex items-start gap-3">
-        <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${iconBg}`}>
-          <Sparkles className="w-4 h-4" />
-        </div>
-        <div className="flex-1 min-w-0 space-y-1">
-          <div className="font-medium truncate cursor-pointer hover:underline" onClick={onOpen}>{v.nome_completo}</div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Badge variant="outline" className={`text-[10px] h-4 px-1.5 ${prioStyle.badge}`}>{prioStyle.label}</Badge>
-            <Badge variant="outline" className="text-[10px] h-4 px-1.5">{ETAPA_LABEL[etapa]}</Badge>
+      <CardContent className="p-4">
+
+        {/* Barra de jornada */}
+        <JornadaBar tipoPessoa={v.tipo_pessoa} pronto={!!evolucao.sugestao} />
+
+        <div className="flex items-start gap-3 mt-3">
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${iconBg}`}>
+            <Sparkles className="w-4 h-4" />
           </div>
-          <div className="text-xs text-muted-foreground">
-            {[v.telefone_celular, v.bairro].filter(Boolean).join(" - ") || "sem contato"}
-            {" - "}Dia {dias} - {nv} {nv === 1 ? "visita" : "visitas"}
+
+          <div className="flex-1 min-w-0 space-y-1.5">
+
+            {/* Nome + badges */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className="font-medium truncate cursor-pointer hover:underline"
+                onClick={onOpen}
+              >
+                {v.nome_completo}
+              </span>
+              <Badge variant="outline" className={`text-[10px] h-4 px-1.5 ${prioStyle.badge}`}>
+                {prioStyle.label}
+              </Badge>
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                {ETAPA_LABEL[etapa]}
+              </Badge>
+            </div>
+
+            {/* Meta */}
+            <p className="text-xs text-muted-foreground" translate="no">
+              {[v.telefone_celular, v.bairro].filter(Boolean).join(" - ") || "sem contato"}
+              {" — "}Dia {dias} · {nv} {nv === 1 ? "visita" : "visitas"}
+            </p>
+
+            {/* Banner de evolução */}
+            {evolucao.sugestao && (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-success/30 bg-success/5 px-3 py-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <TrendingUp className="w-3.5 h-3.5 text-success shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-success" translate="no">
+                      Pronto para {evolucao.proximo}
+                    </p>
+                    <p className="text-[10px] text-success/70 truncate" translate="no">
+                      {evolucao.descricao}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="shrink-0 text-[10px] h-6 px-2 gap-1 bg-success hover:bg-success/90 text-white border-0"
+                  disabled={busyPromote}
+                  onClick={() => onPromover(evolucao.sugestao!)}
+                >
+                  <TrendingUp className="w-3 h-3" />
+                  Promover
+                </Button>
+              </div>
+            )}
           </div>
-        </div>
-        <div className="flex flex-col gap-1 shrink-0">
-          <Button size="sm" variant="outline" className="gap-1 text-[11px] h-6 px-2" disabled={busy} onClick={onRetorno}>
-            <RotateCcw className="w-3 h-3" /> Retorno
-          </Button>
-          <Button size="sm" variant="outline" className="gap-1 text-[11px] h-6 px-2" disabled={busy} onClick={onContato}>
-            <Phone className="w-3 h-3" /> Contato
-          </Button>
-          <Button size="sm" className="gap-1 text-[11px] h-6 px-2 bg-[#25D366] hover:bg-[#128C7E] text-white border-0"
-            disabled={busy || !v.telefone_celular} onClick={onWhatsApp}>
-            <MessageCircle className="w-3 h-3" /> WhatsApp
-          </Button>
+
+          {/* Botões de ação */}
+          <div className="flex flex-col gap-1 shrink-0">
+            <Button size="sm" variant="outline" className="gap-1 text-[11px] h-6 px-2" disabled={busy} onClick={onRetorno}>
+              <RotateCcw className="w-3 h-3" /> Retorno
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1 text-[11px] h-6 px-2" disabled={busy} onClick={onContato}>
+              <Phone className="w-3 h-3" /> Contato
+            </Button>
+            <Button size="sm" className="gap-1 text-[11px] h-6 px-2 bg-[#25D366] hover:bg-[#128C7E] text-white border-0"
+              disabled={busy || !v.telefone_celular} onClick={onWhatsApp}>
+              <MessageCircle className="w-3 h-3" /> WhatsApp
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
