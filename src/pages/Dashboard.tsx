@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
-import { Users, Cake, Heart, HeartHandshake, Quote, Home } from "lucide-react";
+import { Users, Cake, Heart, HeartHandshake, Quote, Home, UserPlus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ListState";
+import { Button } from "@/components/ui/button";
 import { verseOfTheDay } from "@/lib/agenda/verses";
 import VisitantesDashWidget from "@/components/membros/VisitantesDashWidget";
+import VisitanteRapidoDialog from "@/components/membros/VisitanteRapidoDialog";
 
 interface Stats { membros: number; ativos: number; ministerios: number; familias: number; }
 interface Aniv  { id: string; nome_completo: string; data_nascimento: string; }
@@ -22,6 +24,7 @@ export default function Dashboard() {
   const [casamentos, setCasamentos] = useState<Aniv[]>([]);
   const [nome, setNome] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [openVisitanteRapido, setOpenVisitanteRapido] = useState(false);
   const verse = verseOfTheDay();
 
   useEffect(() => {
@@ -76,7 +79,19 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title={`${saudacao}${nome ? `, ${nome}` : ""}!`} description="Que bom ter voce aqui. Vamos servir juntos." />
+      <PageHeader
+        title={`${saudacao}${nome ? `, ${nome}` : ""}!`}
+        description="Que bom ter voce aqui. Vamos servir juntos."
+        actions={
+          <Button
+            onClick={() => setOpenVisitanteRapido(true)}
+            className="gap-2 bg-gold hover:bg-gold/90 text-white border-0 shadow-sm"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span translate="no">Visitante Rápido</span>
+          </Button>
+        }
+      />
       <div className="p-4 md:p-8 space-y-6">
 
         <Card className="overflow-hidden border-0 shadow-elevated bg-gradient-verse text-foreground relative">
@@ -173,6 +188,12 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      <VisitanteRapidoDialog
+        open={openVisitanteRapido}
+        onOpenChange={setOpenVisitanteRapido}
+        onSaved={loadStats}
+      />
     </div>
   );
 }
