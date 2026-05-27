@@ -28,24 +28,53 @@ export interface VisitanteFluxo {
 }
 
 // ------------------------------------------------------------
-// Mensagens contextualizadas por etapa
+// Versículos de promessa por etapa
+// ------------------------------------------------------------
+const VERSICULO: Record<EtapaFluxo, string> = {
+  boas_vindas:
+    '"Seja forte e corajoso… O Senhor, o seu Deus, estará com você por onde quer que você andar." — Josué 1:9',
+  incentivo:
+    '"Venham a mim, todos os que estão cansados e sobrecarregados, e eu darei descanso a vocês." — Mateus 11:28',
+  cuidado:
+    '"O Senhor está perto dos que têm o coração quebrantado e salva os de espírito abatido." — Salmos 34:18',
+  nao_voltou:
+    '"O Senhor é bom, um refúgio nos tempos de angústia; ele cuida dos que buscam a sua proteção." — Naum 1:7',
+  retornou:
+    '"Como é bom e agradável quando os irmãos vivem em união!" — Salmos 133:1',
+  em_acompanhamento:
+    '"Porque eu, o Senhor, sou o seu Deus, que o sustento pela mão direita." — Isaías 41:13',
+};
+
+// ------------------------------------------------------------
+// Mensagens contextualizadas por etapa (com versículo)
 // ------------------------------------------------------------
 export function getMensagem(etapa: EtapaFluxo, nomeCompleto: string): string {
-  const nome = nomeCompleto.split(" ")[0];
-  switch (etapa) {
-    case "boas_vindas":
-      return `Olá, ${nome}! Foi uma alegria receber você na igreja 😊 Você é muito bem-vindo(a)! 🙏`;
-    case "incentivo":
-      return `Olá, ${nome}! Como você está? 😊 Esperamos te ver novamente em breve! 🙏`;
-    case "cuidado":
-      return `Olá, ${nome}! Estamos orando por você 🙏 Se precisar de algo, conte conosco 💙`;
-    case "nao_voltou":
-      return `Olá, ${nome}! Sentimos sua falta! Esperamos te ver novamente em breve 💙🙏`;
-    case "retornou":
-      return `Que alegria ter você novamente conosco, ${nome}! 😊`;
-    default:
-      return `Olá, ${nome}! Estamos pensando em você 💙`;
-  }
+  const nome      = nomeCompleto.split(" ")[0];
+  const versiculo = VERSICULO[etapa] ?? VERSICULO.em_acompanhamento;
+
+  const corpo: Record<EtapaFluxo, string> = {
+    boas_vindas:
+      `Foi uma alegria receber você conosco! Você é muito bem-vindo(a) e esperamos te ver por aqui mais vezes.`,
+    incentivo:
+      `Estamos com saudades! Gostaríamos muito de te ver novamente. As portas estão sempre abertas para você.`,
+    cuidado:
+      `Estamos orando por você e pensando em como você está. Se precisar de algo, pode contar conosco.`,
+    nao_voltou:
+      `Sentimos a sua falta! Você tem um lugar especial aqui e gostaríamos muito de te abraçar novamente.`,
+    retornou:
+      `Que alegria imensa ter você novamente conosco! A sua presença nos alegra muito.`,
+    em_acompanhamento:
+      `Continuamos aqui, pensando em você e na sua jornada. Que bom caminhar juntos!`,
+  };
+
+  const texto = corpo[etapa] ?? corpo.em_acompanhamento;
+
+  return (
+    `Olá, ${nome}! 😊\n` +
+    `${texto}\n\n` +
+    `✨ ${versiculo}\n\n` +
+    `Estamos à disposição 💙`
+  );
 }
 
 // ------------------------------------------------------------
@@ -89,7 +118,7 @@ export function calcularPrioridade(
   if (numero_visitas >= 2) return "baixa";
   const dias = diasDesde(created_at);
   if (dias > 15) return "alta";
-  if (dias > 7) return "media";
+  if (dias > 7)  return "media";
   return "baixa";
 }
 
@@ -107,18 +136,12 @@ export function precisaAcao(ultimo_contato_em: string | null | undefined): boole
 // ------------------------------------------------------------
 export function getStatusPorEtapa(etapa: EtapaFluxo): string {
   switch (etapa) {
-    case "boas_vindas":
-      return "novo";
-    case "incentivo":
-      return "contato_inicial";
-    case "cuidado":
-      return "em_acompanhamento";
-    case "nao_voltou":
-      return "tentativa_reengajamento";
-    case "retornou":
-      return "integrado";
-    default:
-      return "em_acompanhamento";
+    case "boas_vindas":        return "novo";
+    case "incentivo":          return "contato_inicial";
+    case "cuidado":            return "em_acompanhamento";
+    case "nao_voltou":         return "tentativa_reengajamento";
+    case "retornou":           return "integrado";
+    default:                   return "em_acompanhamento";
   }
 }
 
@@ -138,7 +161,7 @@ export const PRIORIDADE_STYLE: Record<
   Prioridade,
   { border: string; badge: string; label: string }
 > = {
-  alta:  { border: "border-l-destructive", badge: "bg-destructive/10 text-destructive border-destructive/30",  label: "Alta" },
+  alta:  { border: "border-l-destructive", badge: "bg-destructive/10 text-destructive border-destructive/30",  label: "Alta"  },
   media: { border: "border-l-warning",     badge: "bg-warning/15 text-warning border-warning/30",              label: "Média" },
   baixa: { border: "border-l-success",     badge: "bg-success/15 text-success border-success/30",              label: "Baixa" },
 };
