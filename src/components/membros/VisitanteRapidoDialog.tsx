@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -7,11 +7,20 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { UserPlus, Check, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 
 interface Props {
   open: boolean;
@@ -19,20 +28,62 @@ interface Props {
   onSaved?: () => void;
 }
 
+interface MembroItem {
+  id:            string;
+  nome_completo: string;
+}
+
+// Sentinelas de seleção (nunca chegam ao banco)
+const NENHUM = "__none__";
+const OUTRO  = "__outro__";
+
+// ── Componente ─────────────────────────────────────────────────────────────────
+
 export default function VisitanteRapidoDialog({ open, onOpenChange, onSaved }: Props) {
-  const [nome, setNome] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [quemConvidou, setQuemConvidou] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<{ nome?: string; telefone?: string }>({});
+  const [nome,          setNome]          = useState("");
+  const [telefone,      setTelefone]      = useState("");
+  const [saving,        setSaving]        = useState(false);
+  const [errors,        setErrors]        = useState<{ nome?: string; telefone?: string }>({});
+
+  // ── "Quem convidou" ────────────────────────────────────────────────────────
+  const [membrosLista,  setMembrosLista]  = useState<MembroItem[]>([]);
+  const [loadingMembros, setLoadingMembros] = useState(false);
+  // convidadoSel: uuid selecionado | OUTRO | NENHUM | ""
+  const [convidadoSel,  setConvidadoSel]  = useState<string>(NENHUM);
+  // convidadoTexto: digitado manualmente quando OUTRO
+  const [convidadoTexto, setConvidadoTexto] = useState("");
+
+  // Carrega a lista de membros/congregados assim que o dialog abre
+  useEffect(() => {
+    if (!open) return;
+    setLoadingMembros(true);
+    supabase
+      .from("membros")
+      .select("id, nome_completo")
+      .in("tipo_pessoa", ["membro", "congregado"])
+      .order("nome_completo")
+      .then(({ data }) => {
+        setMembrosLista((data ?? []) as MembroItem[]);
+        setLoadingMembros(false);
+      });
+  }, [open]);
+
+  // ── Derivados ──────────────────────────────────────────────────────────────
+
+  const isOutro      = convidadoSel === OUTRO;
+  const membroNome   = membrosLista.find(m => m.id === convidadoSel)?.nome_completo ?? null;
+
+  // ── Validação ──────────────────────────────────────────────────────────────
 
   const validate = () => {
     const e: typeof errors = {};
-    if (!nome.trim()) e.nome = "Nome é obrigatório";
+    if (!nome.trim())     e.nome     = "Nome é obrigatório";
     if (!telefone.trim()) e.telefone = "WhatsApp/telefone é obrigatório";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
+
+  // ── Tarefas de acolhimento ─────────────────────────────────────────────────
 
   const criarTarefas = async (visitanteId: string, nomeCompleto: string) => {
     const primeiro = nomeCompleto.split(" ")[0];
@@ -43,35 +94,52 @@ export default function VisitanteRapidoDialog({ open, onOpenChange, onSaved }: P
       return d.toISOString().split("T")[0];
     };
     const tarefas = [
-      { visitante_id: visitanteId, titulo: `Enviar mensagem de boas-vindas — ${primeiro}`, data: addDias(0) },
-      { visitante_id: visitanteId, titulo: `Entrar em contato com visitante — ${primeiro}`, data: addDias(2) },
-      { visitante_id: visitanteId, titulo: `Convidar ${primeiro} para retornar ao culto`, data: addDias(7) },
-      { visitante_id: visitanteId, titulo: `Recontato — verificar situação de ${primeiro}`, data: addDias(15) },
+      { visitante_id: visitanteId, titulo: `Enviar mensagem de boas-vindas — ${primeiro}`,    data: addDias(0)  },
+      { visitante_id: visitanteId, titulo: `Entrar em contato com visitante — ${primeiro}`,   data: addDias(2)  },
+      { visitante_id: visitanteId, titulo: `Convidar ${primeiro} para retornar ao culto`,      data: addDias(7)  },
+      { visitante_id: visitanteId, titulo: `Recontato — verificar situação de ${primeiro}`,   data: addDias(15) },
     ];
     const { error } = await supabase.from("acolhimento_tarefas").insert(tarefas);
     if (error) console.error("Erro ao criar tarefas de acolhimento:", error.message);
   };
 
+  // ── Salvar ────────────────────────────────────────────────────────────────
+
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
 
+    // Campos de "quem convidou" dependendo da seleção
+    const temMembroSelecionado = convidadoSel && convidadoSel !== NENHUM && convidadoSel !== OUTRO;
+    const temTextoManual       = isOutro && convidadoTexto.trim();
+
+    const camposConvidado = temMembroSelecionado
+      ? {
+          convidado_por:          convidadoSel,
+          convidado_nome:         null,
+          como_conheceu:          "indicacao_membro",
+          como_conheceu_descricao: membroNome ?? "",
+        }
+      : temTextoManual
+      ? {
+          convidado_por:          null,
+          convidado_nome:         convidadoTexto.trim(),
+          como_conheceu:          "indicacao_membro",
+          como_conheceu_descricao: convidadoTexto.trim(),
+        }
+      : {};
+
     const { data, error } = await supabase
       .from("membros")
       .insert({
-        nome_completo: nome.trim(),
-        telefone_celular: telefone.trim(),
-        tipo_pessoa: "visitante",
-        numero_visitas: 1,
+        nome_completo:     nome.trim(),
+        telefone_celular:  telefone.trim(),
+        tipo_pessoa:       "visitante",
+        numero_visitas:    1,
         status_acolhimento: "novo",
-        perfil_acesso: "membro",
-        ...(quemConvidou.trim()
-          ? {
-              como_conheceu: "indicacao_membro",
-              como_conheceu_descricao: quemConvidou.trim(),
-            }
-          : {}),
-      })
+        perfil_acesso:     "membro",
+        ...camposConvidado,
+      } as any)
       .select()
       .single();
 
@@ -90,19 +158,21 @@ export default function VisitanteRapidoDialog({ open, onOpenChange, onSaved }: P
     onSaved?.();
   };
 
+  // ── Reset ─────────────────────────────────────────────────────────────────
+
   const handleReset = () => {
     setNome("");
     setTelefone("");
-    setQuemConvidou("");
+    setConvidadoSel(NENHUM);
+    setConvidadoTexto("");
     setErrors({});
     setSaving(false);
     onOpenChange(false);
   };
 
-  const handleClose = () => {
-    if (saving) return;
-    handleReset();
-  };
+  const handleClose = () => { if (!saving) handleReset(); };
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -140,9 +210,7 @@ export default function VisitanteRapidoDialog({ open, onOpenChange, onSaved }: P
               onKeyDown={(e) => e.key === "Enter" && document.getElementById("vr-tel")?.focus()}
               className={errors.nome ? "border-destructive focus-visible:ring-destructive" : ""}
             />
-            {errors.nome && (
-              <p className="text-xs text-destructive">{errors.nome}</p>
-            )}
+            {errors.nome && <p className="text-xs text-destructive">{errors.nome}</p>}
           </div>
 
           {/* Telefone */}
@@ -163,30 +231,52 @@ export default function VisitanteRapidoDialog({ open, onOpenChange, onSaved }: P
                 if (errors.telefone) setErrors((p) => ({ ...p, telefone: undefined }));
               }}
               onKeyDown={(e) =>
-                e.key === "Enter" && document.getElementById("vr-conv")?.focus()
+                e.key === "Enter" && document.getElementById("vr-conv-trigger")?.focus()
               }
               className={errors.telefone ? "border-destructive focus-visible:ring-destructive" : ""}
             />
-            {errors.telefone && (
-              <p className="text-xs text-destructive">{errors.telefone}</p>
-            )}
+            {errors.telefone && <p className="text-xs text-destructive">{errors.telefone}</p>}
           </div>
 
-          {/* Quem convidou */}
+          {/* Quem convidou — Select + input dinâmico */}
           <div className="space-y-1.5">
-            <Label htmlFor="vr-conv" className="flex items-center gap-1.5">
+            <Label className="flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-gold" aria-hidden />
               Quem convidou?
               <span className="text-xs text-muted-foreground font-normal">(opcional)</span>
             </Label>
-            <Input
-              id="vr-conv"
-              placeholder="Nome do membro que trouxe"
-              value={quemConvidou}
-              autoComplete="off"
-              onChange={(e) => setQuemConvidou(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSave()}
-            />
+
+            <Select value={convidadoSel} onValueChange={setConvidadoSel} disabled={loadingMembros}>
+              <SelectTrigger id="vr-conv-trigger">
+                <SelectValue placeholder={loadingMembros ? "Carregando…" : "Selecione ou deixe em branco"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NENHUM}>
+                  — Não informado —
+                </SelectItem>
+                {membrosLista.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.nome_completo}
+                  </SelectItem>
+                ))}
+                <SelectItem value={OUTRO}>
+                  ✏️ Outro (não está na lista)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Campo de texto manual — só aparece quando "Outro" selecionado */}
+            {isOutro && (
+              <Input
+                id="vr-conv-manual"
+                placeholder="Digite o nome de quem convidou"
+                value={convidadoTexto}
+                autoComplete="off"
+                autoFocus
+                onChange={(e) => setConvidadoTexto(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSave()}
+              />
+            )}
           </div>
         </div>
 
