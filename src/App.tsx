@@ -17,6 +17,7 @@ import PainelEstrategico from "./pages/PainelEstrategico.tsx";
 import Organograma from "./pages/Organograma.tsx";
 import RecuperacaoSenhaAdmin from "./pages/RecuperacaoSenhaAdmin.tsx";
 import LgpdAdmin from "./pages/LgpdAdmin.tsx";
+import IdentidadeAdmin from "./pages/IdentidadeAdmin.tsx";
 import AgendaPrint from "./pages/AgendaPrint.tsx";
 import { AuthProvider } from "./hooks/useAuth.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
@@ -49,6 +50,7 @@ const App = () => (
                   <Route path="/organograma" element={<Organograma />} />
                   <Route path="/admin/recuperacao-senha" element={<RecuperacaoSenhaAdmin />} />
                   <Route path="/admin/lgpd" element={<LgpdAdmin />} />
+                  <Route path="/admin/identidade" element={<IdentidadeAdmin />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

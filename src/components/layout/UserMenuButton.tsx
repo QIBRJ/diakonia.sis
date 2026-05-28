@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   KeyRound,
   ShieldAlert,
+  Church,
 } from "lucide-react";
 
 /**
@@ -168,6 +169,13 @@ export function UserMenuButton() {
             >
               <ShieldAlert className="w-4 h-4 text-muted-foreground" />
               <span>Painel LGPD</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2 cursor-pointer py-2.5"
+              onClick={() => navigate("/admin/identidade")}
+            >
+              <Church className="w-4 h-4 text-muted-foreground" />
+              <span>Identidade da Igreja</span>
             </DropdownMenuItem>
           </>
         )}

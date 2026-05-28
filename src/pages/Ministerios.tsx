@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, HeartHandshake, Users, Layers, Pencil } from "lucide-react";
+import { Plus, HeartHandshake, Users, Layers, Pencil, Sparkles, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -33,6 +33,8 @@ export default function Ministerios() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const emptyForm = { nome: "", sigla: "", descricao: "", lider_id: "", co_lider_id: "", ativo: true };
   const [form, setForm] = useState<any>(emptyForm);
+  const [sugestao, setSugestao] = useState<{ nome: string; descricao: string; responsabilidades: string } | null>(null);
+  const [buscandoModelo, setBuscandoModelo] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -62,6 +64,28 @@ export default function Ministerios() {
     setLoading(false);
   };
   useEffect(()=>{ load(); }, []);
+
+  // Auto-preenchimento via buscar_modelo_ministerio()
+  useEffect(() => {
+    if (editingId || !open) { setSugestao(null); return; }
+    const nome = form.nome?.trim();
+    if (!nome || nome.length < 4) { setSugestao(null); return; }
+    setBuscandoModelo(true);
+    const timer = setTimeout(async () => {
+      const { data } = await supabase.rpc("buscar_modelo_ministerio", { p_nome: nome });
+      setBuscandoModelo(false);
+      if (data && (data as any).encontrado) {
+        setSugestao({
+          nome: (data as any).nome ?? "",
+          descricao: (data as any).descricao ?? "",
+          responsabilidades: (data as any).responsabilidades ?? "",
+        });
+      } else {
+        setSugestao(null);
+      }
+    }, 600);
+    return () => { clearTimeout(timer); setBuscandoModelo(false); };
+  }, [form.nome, editingId, open]);
 
   const memberName = (id: string|null) => membros.find(m=>m.id===id)?.nome_completo;
 
@@ -98,7 +122,17 @@ export default function Ministerios() {
 
   const handleOpenChange = (o: boolean) => {
     setOpen(o);
-    if (!o) { setEditingId(null); setForm(emptyForm); }
+    if (!o) { setEditingId(null); setForm(emptyForm); setSugestao(null); }
+  };
+
+  const aplicarModelo = () => {
+    if (!sugestao) return;
+    const desc = sugestao.responsabilidades
+      ? `${sugestao.descricao}\n\nResponsabilidades:\n${sugestao.responsabilidades}`
+      : sugestao.descricao;
+    setForm((f: any) => ({ ...f, descricao: desc }));
+    setSugestao(null);
+    toast.success("Modelo aplicado — ajuste conforme necessário");
   };
 
   return (
@@ -165,9 +199,37 @@ export default function Ministerios() {
           <DialogHeader><DialogTitle className="font-serif text-2xl">{editingId ? "Editar ministério" : "Novo ministério"}</DialogTitle></DialogHeader>
           <form onSubmit={onSubmit} className="space-y-3">
             <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2"><Label>Nome *</Label><Input required value={form.nome} onChange={(e)=>setForm({...form, nome: e.target.value})}/></div>
+              <div className="col-span-2">
+                <Label>Nome *</Label>
+                <div className="relative">
+                  <Input required value={form.nome} onChange={(e)=>setForm({...form, nome: e.target.value})}/>
+                  {buscandoModelo && (
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground animate-pulse">buscando…</span>
+                  )}
+                </div>
+              </div>
               <div><Label>Sigla</Label><Input value={form.sigla} onChange={(e)=>setForm({...form, sigla: e.target.value})}/></div>
             </div>
+            {sugestao && (
+              <div className="rounded-md border border-gold/40 bg-gold/5 px-3 py-2.5 flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-gold mt-0.5 shrink-0"/>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gold">Modelo encontrado: {sugestao.nome}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{sugestao.descricao}</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button type="button" size="sm" variant="outline"
+                    className="h-7 text-xs border-gold/40 text-gold hover:bg-gold/10"
+                    onClick={aplicarModelo}>
+                    Aplicar
+                  </Button>
+                  <button type="button" onClick={()=>setSugestao(null)}
+                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-muted">
+                    <X className="w-3.5 h-3.5 text-muted-foreground"/>
+                  </button>
+                </div>
+              </div>
+            )}
             <div><Label>Descrição</Label><Textarea rows={3} value={form.descricao} onChange={(e)=>setForm({...form, descricao: e.target.value})}/></div>
             <div className="grid grid-cols-2 gap-3">
               <div>

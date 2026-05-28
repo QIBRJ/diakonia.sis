@@ -15,6 +15,7 @@ import {
   Building2,
   KeyRound,
   ShieldAlert,
+  Church,
 } from "lucide-react";
 import { BrandMark } from "@/components/Brand";
 import { useEffect } from "react";
@@ -46,6 +47,7 @@ const pageTitles: Record<string, string> = {
   "/organograma": "Organograma",
   "/admin/recuperacao-senha": "Recuperação de Senhas",
   "/admin/lgpd": "Painel LGPD",
+  "/admin/identidade": "Identidade da Igreja",
 };
 
 export default function AppLayout() {
@@ -140,6 +142,19 @@ export default function AppLayout() {
             >
               <ShieldAlert className="w-4 h-4" />
               <span translate="no">Painel LGPD</span>
+            </NavLink>
+            <NavLink
+              to="/admin/identidade"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-gold"
+                    : "hover:bg-sidebar-accent/60 text-sidebar-foreground/80"
+                }`
+              }
+            >
+              <Church className="w-4 h-4" />
+              <span translate="no">Identidade da Igreja</span>
             </NavLink>
           </div>
         )}
