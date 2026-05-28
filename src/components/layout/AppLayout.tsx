@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   MapPin,
   BarChart2,
+  Building2,
 } from "lucide-react";
 import { BrandMark } from "@/components/Brand";
 import { useEffect } from "react";
@@ -27,6 +28,7 @@ const desktopNav = [
   { to: "/eventos", label: "Agenda", icon: CalendarDays },
   { to: "/locais", label: "Locais", icon: MapPin },
   { to: "/painel-estrategico", label: "Crescimento", icon: BarChart2 },
+  { to: "/organograma", label: "Organograma", icon: Building2 },
 ];
 
 const pageTitles: Record<string, string> = {
@@ -38,6 +40,7 @@ const pageTitles: Record<string, string> = {
   "/locais": "Locais",
   "/visitantes": "Visitantes",
   "/painel-estrategico": "Crescimento",
+  "/organograma": "Organograma",
 };
 
 export default function AppLayout() {
