@@ -31,6 +31,7 @@ import {
   type VisitanteFluxo,
 } from "@/lib/visitantesFluxo";
 import { avaliarEvolucao } from "@/lib/evolucaoFluxo";
+import { logHistorico } from "@/lib/historicoFluxo";
 import type { Membro } from "@/pages/Membros";
 
 // ── Interfaces ───────────────────────────────────────────────────────────────
@@ -164,6 +165,7 @@ export default function AcoesHoje({ limit }: AcoesHojeProps = {}) {
       toast.error(error.message);
     } else {
       toast.success(`Contato registrado para ${v.nome_completo.split(" ")[0]}! ✅`);
+      await logHistorico(v.id, "whatsapp", tipo + (observacao ? ` — ${observacao}` : ""));
       load();
     }
     setBusyId(null);

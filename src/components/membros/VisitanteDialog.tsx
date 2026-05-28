@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Trash2, CalendarCheck, Phone, Home as HomeIcon, ArrowRight, RotateCcw } from "lucide-react";
 import { AcolhimentoPanel } from "./AcolhimentoPanel";
+import VisitanteTimeline from "./VisitanteTimeline";
 import type { Membro } from "@/pages/Membros";
 
 interface VisitanteMembro extends Membro {
@@ -249,47 +250,16 @@ export default function VisitanteDialog({ open, onOpenChange, pessoa, onSaved }:
           </div>
         )}
 
-        {/* M3.5 — Jornada Pastoral */}
-        {(() => {
-          const p = pessoa as VisitanteMembro;
-          const dataCongregado = p.data_congregado;
-          const dataMembro     = p.data_membro;
-          const fmtDate = (iso: string) =>
-            new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-          return (
-            <div className="rounded-lg border bg-muted/20 px-4 py-3 space-y-2">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider" translate="no">
-                Jornada Pastoral
-              </p>
-              <div className="flex flex-wrap gap-x-6 gap-y-1">
-                <span className="text-xs text-muted-foreground" translate="no">
-                  🏠 Visitante desde{" "}
-                  <span className="font-medium text-foreground">{fmtDate(p.created_at)}</span>
-                </span>
-                {dataCongregado && (
-                  <span className="text-xs text-success" translate="no">
-                    ✨ Congregado em{" "}
-                    <span className="font-medium">{fmtDate(dataCongregado)}</span>
-                  </span>
-                )}
-                {dataMembro && (
-                  <span className="text-xs text-primary" translate="no">
-                    🌟 Membro desde{" "}
-                    <span className="font-medium">{fmtDate(dataMembro)}</span>
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-
         <Tabs defaultValue="visitas">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="visitas" translate="no">
-              <CalendarCheck className="w-4 h-4 mr-1.5" /> Visitas
+              <CalendarCheck className="w-4 h-4 mr-1" /> Visitas
+            </TabsTrigger>
+            <TabsTrigger value="historico" translate="no">
+              📋 Jornada
             </TabsTrigger>
             <TabsTrigger value="acomp" translate="no">
-              <Phone className="w-4 h-4 mr-1.5" /> Acompanhamento
+              <Phone className="w-4 h-4 mr-1" /> Contatos
             </TabsTrigger>
             <TabsTrigger value="acolhimento" translate="no">
               Acolhimento 💙
@@ -298,6 +268,18 @@ export default function VisitanteDialog({ open, onOpenChange, pessoa, onSaved }:
               <ArrowRight className="w-4 h-4 mr-1.5" /> Converter
             </TabsTrigger>
           </TabsList>
+
+          {/* JORNADA / HISTÓRICO */}
+          <TabsContent value="historico" className="mt-4">
+            {pessoa && (
+              <VisitanteTimeline
+                pessoaId={pessoa.id}
+                dataCadastro={(pessoa as VisitanteMembro).created_at}
+                dataCongregado={(pessoa as VisitanteMembro).data_congregado}
+                dataMembro={(pessoa as VisitanteMembro).data_membro}
+              />
+            )}
+          </TabsContent>
 
           {/* VISITAS */}
           <TabsContent value="visitas" className="space-y-4 mt-4">

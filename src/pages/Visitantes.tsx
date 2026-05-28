@@ -23,6 +23,7 @@ import {
   avaliarEvolucao,
   ETAPAS_JORNADA,
 } from "@/lib/evolucaoFluxo";
+import { logHistorico } from "@/lib/historicoFluxo";
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -115,8 +116,13 @@ export default function Visitantes() {
     const { error } = await supabase.from("membros")
       .update({ ultimo_contato_em: new Date().toISOString(), status_acolhimento: getStatusPorEtapa(etapa) })
       .eq("id", v.id);
-    if (error) toast.error(error.message);
-    else { toast.success("Contato registrado!"); load(); }
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Contato registrado!");
+      await logHistorico(v.id, "observacao", "Contato registrado");
+      load();
+    }
     setBusyId(null);
   };
 
@@ -143,6 +149,8 @@ export default function Visitantes() {
     } else {
       const label = para === "congregado" ? "Congregado" : "Membro";
       toast.success(`${v.nome_completo.split(" ")[0]} deu o próximo passo — agora é ${label}! 🎉`);
+      const tipoLog = para === "congregado" ? "promocao_congregado" as const : "promocao_membro" as const;
+      await logHistorico(v.id, tipoLog, `Promovido a ${label}`);
       load();
     }
     setBusyPromote(null);
