@@ -27,21 +27,39 @@ export default function Dashboard() {
   const [openVisitanteRapido, setOpenVisitanteRapido] = useState(false);
   const verse = verseOfTheDay();
 
-  // Extrai primeiro nome humano — ignora se o campo contiver @
-  const extrairNome = (valor: string | null | undefined): string => {
-    if (!valor) return "";
-    const v = valor.includes("@") ? valor.split("@")[0] : valor;
-    const primeiro = v.split(" ")[0];
-    return primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase();
+  // Extrai primeiro nome real — descarta se parecer email
+  const primeiroNome = (valor: string | null | undefined): string => {
+    if (!valor || valor.includes("@")) return "";
+    const p = valor.trim().split(" ")[0];
+    return p.charAt(0).toUpperCase() + p.slice(1);
   };
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle()
-      .then(({ data }) => {
-        const nomeExtraido = extrairNome(data?.nome) || extrairNome(user.email);
-        setNome(nomeExtraido);
-      });
+    (async () => {
+      // 1. Tenta profiles.nome (nome real cadastrado no signup)
+      const { data: prof } = await supabase
+        .from("profiles").select("nome").eq("id", user.id).maybeSingle();
+      const nomePerfil = primeiroNome(prof?.nome);
+      if (nomePerfil) { setNome(nomePerfil); return; }
+
+      // 2. Fallback: busca nome_completo na tabela membros pelo e-mail
+      const { data: membro } = await supabase
+        .from("membros").select("nome_completo")
+        .eq("email", user.email ?? "").maybeSingle();
+      const nomeMembro = primeiroNome(membro?.nome_completo);
+      if (nomeMembro) {
+        setNome(nomeMembro);
+        // Corrige profiles.nome para o futuro
+        await supabase.from("profiles").update({ nome: membro!.nome_completo })
+          .eq("id", user.id);
+        return;
+      }
+
+      // 3. Último recurso: parte do e-mail antes do @
+      const fallback = (user.email ?? "").split("@")[0];
+      setNome(fallback.charAt(0).toUpperCase() + fallback.slice(1));
+    })();
   }, [user]);
 
   const loadStats = async () => {

@@ -29,20 +29,37 @@ export function UserMenuButton() {
   const navigate = useNavigate();
   const [nome, setNome] = useState<string>("");
 
+  const primeiroNome = (valor: string | null | undefined): string => {
+    if (!valor || valor.includes("@")) return "";
+    const p = valor.trim().split(" ")[0];
+    return p.charAt(0).toUpperCase() + p.slice(1);
+  };
+
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("profiles")
-      .select("nome")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        // Se profiles.nome contiver "@", trata como email e extrai só o login
-        const raw = data?.nome || user.email || "";
-        const base = raw.includes("@") ? raw.split("@")[0] : raw;
-        const primeiro = base.split(" ")[0];
-        setNome(primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase());
-      });
+    (async () => {
+      // 1. profiles.nome (nome real do signup)
+      const { data: prof } = await supabase
+        .from("profiles").select("nome").eq("id", user.id).maybeSingle();
+      const nomePerfil = primeiroNome(prof?.nome);
+      if (nomePerfil) { setNome(nomePerfil); return; }
+
+      // 2. Fallback: membros.nome_completo pelo e-mail
+      const { data: membro } = await supabase
+        .from("membros").select("nome_completo")
+        .eq("email", user.email ?? "").maybeSingle();
+      const nomeMembro = primeiroNome(membro?.nome_completo);
+      if (nomeMembro) {
+        setNome(nomeMembro);
+        await supabase.from("profiles").update({ nome: membro!.nome_completo })
+          .eq("id", user.id);
+        return;
+      }
+
+      // 3. Último recurso: parte antes do @
+      const fallback = (user.email ?? "").split("@")[0];
+      setNome(fallback.charAt(0).toUpperCase() + fallback.slice(1));
+    })();
   }, [user]);
 
   if (!user) return null;
