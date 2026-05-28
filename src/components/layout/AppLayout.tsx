@@ -16,6 +16,9 @@ import {
   KeyRound,
   ShieldAlert,
   Church,
+  FileText,
+  Upload,
+  Download,
 } from "lucide-react";
 import { BrandMark } from "@/components/Brand";
 import { useEffect } from "react";
@@ -48,6 +51,9 @@ const pageTitles: Record<string, string> = {
   "/admin/recuperacao-senha": "Recuperação de Senhas",
   "/admin/lgpd": "Painel LGPD",
   "/admin/identidade": "Identidade da Igreja",
+  "/admin/documentos": "Documentos Institucionais",
+  "/admin/importacao": "Importação de Membros",
+  "/admin/exportacao": "Exportação de Dados",
 };
 
 export default function AppLayout() {
@@ -155,6 +161,45 @@ export default function AppLayout() {
             >
               <Church className="w-4 h-4" />
               <span translate="no">Identidade da Igreja</span>
+            </NavLink>
+            <NavLink
+              to="/admin/documentos"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-gold"
+                    : "hover:bg-sidebar-accent/60 text-sidebar-foreground/80"
+                }`
+              }
+            >
+              <FileText className="w-4 h-4" />
+              <span translate="no">Documentos</span>
+            </NavLink>
+            <NavLink
+              to="/admin/importacao"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-gold"
+                    : "hover:bg-sidebar-accent/60 text-sidebar-foreground/80"
+                }`
+              }
+            >
+              <Upload className="w-4 h-4" />
+              <span translate="no">Importação de Membros</span>
+            </NavLink>
+            <NavLink
+              to="/admin/exportacao"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-gold"
+                    : "hover:bg-sidebar-accent/60 text-sidebar-foreground/80"
+                }`
+              }
+            >
+              <Download className="w-4 h-4" />
+              <span translate="no">Exportação de Dados</span>
             </NavLink>
           </div>
         )}

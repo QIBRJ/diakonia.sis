@@ -20,6 +20,9 @@ import {
   KeyRound,
   ShieldAlert,
   Church,
+  FileText,
+  Upload,
+  Download,
 } from "lucide-react";
 
 /**
@@ -176,6 +179,27 @@ export function UserMenuButton() {
             >
               <Church className="w-4 h-4 text-muted-foreground" />
               <span>Identidade da Igreja</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2 cursor-pointer py-2.5"
+              onClick={() => navigate("/admin/documentos")}
+            >
+              <FileText className="w-4 h-4 text-muted-foreground" />
+              <span>Documentos</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2 cursor-pointer py-2.5"
+              onClick={() => navigate("/admin/importacao")}
+            >
+              <Upload className="w-4 h-4 text-muted-foreground" />
+              <span>Importação de Membros</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2 cursor-pointer py-2.5"
+              onClick={() => navigate("/admin/exportacao")}
+            >
+              <Download className="w-4 h-4 text-muted-foreground" />
+              <span>Exportação de Dados</span>
             </DropdownMenuItem>
           </>
         )}

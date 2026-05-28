@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -19,7 +19,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
   FileText, Plus, Pencil, CheckCircle2, Clock, Loader2,
-  BookOpen, ChevronDown, ChevronUp, Trash2, Network, Info,
+  BookOpen, ChevronDown, ChevronUp, Trash2, Network, Info, History,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,6 +50,17 @@ interface Secao {
   ordem: number;
 }
 
+interface HistoricoItem {
+  id: string;
+  acao: string;
+  usuario_email: string | null;
+  versao_de: string | null;
+  versao_para: string | null;
+  titulo_doc: string | null;
+  observacao: string | null;
+  created_at: string;
+}
+
 const TIPOS: { value: TipoDoc; label: string; color: string }[] = [
   { value: "estatuto",   label: "Estatuto",    color: "bg-purple-500/10 text-purple-700 border-purple-500/30" },
   { value: "regimento",  label: "Regimento",   color: "bg-blue-500/10 text-blue-700 border-blue-500/30" },
@@ -70,7 +81,7 @@ const TIPOS_SECAO = [
   { value: "outro",       label: "Outro" },
 ];
 
-// ── Estrutura Derivada ────────────────────────────────────────
+// ── Estrutura Derivada ─────────────────────────────────────────
 interface EstruturaItem {
   id: string;
   tipo: string;
@@ -99,6 +110,14 @@ const NIVEIS_ESTRUTURA = [
   { value: "ministerial",   label: "Ministerial" },
   { value: "area",          label: "Área" },
 ];
+
+const ACAO_LABELS: Record<string, string> = {
+  criado:          "Criado",
+  atualizado:      "Atualizado",
+  substituido:     "Substituído",
+  marcado_vigente: "Marcado como Vigente",
+  desativado:      "Desativado",
+};
 
 export default function DocumentosAdmin() {
   const { hasRole } = useAuth();
@@ -140,6 +159,11 @@ export default function DocumentosAdmin() {
   const emptySecao = { titulo: "", conteudo: "", tipo_secao: "geral", ministerio_ref: "", palavras_chave: "", nivel_hierarquico: "", ordem: 0 };
   const [formSecao, setFormSecao] = useState<any>(emptySecao);
 
+  // Histórico de documento
+  const [histDoc, setHistDoc] = useState<Documento | null>(null);
+  const [historico, setHistorico] = useState<HistoricoItem[]>([]);
+  const [loadingHist, setLoadingHist] = useState(false);
+
   useEffect(() => {
     if (!hasRole(["admin", "secretaria"])) navigate("/", { replace: true });
   }, []);
@@ -168,6 +192,19 @@ export default function DocumentosAdmin() {
       .order("ordem");
     setSecoes((data ?? []) as Secao[]);
     setLoadingSecoes(false);
+  };
+
+  const abrirHistorico = async (doc: Documento) => {
+    setHistDoc(doc);
+    setLoadingHist(true);
+    const { data, error } = await supabase
+      .from("documentos_historico")
+      .select("*")
+      .eq("documento_id", doc.id)
+      .order("created_at", { ascending: false });
+    if (error) toast.error(error.message);
+    setHistorico((data ?? []) as HistoricoItem[]);
+    setLoadingHist(false);
   };
 
   // ── Salvar documento ──
@@ -207,7 +244,6 @@ export default function DocumentosAdmin() {
   };
 
   const marcarVigente = async (d: Documento) => {
-    // Remove vigente dos do mesmo tipo, depois marca este
     await supabase.from("documentos").update({ vigente: false }).eq("tipo", d.tipo);
     const { error } = await supabase.from("documentos").update({ vigente: true }).eq("id", d.id);
     if (error) return toast.error(error.message);
@@ -285,7 +321,6 @@ export default function DocumentosAdmin() {
     setSavingEst(true);
     const payload: any = { ...formEst };
     Object.keys(payload).forEach(k => { if (payload[k] === "") payload[k] = null; });
-    // Buscar o igreja_id da primeira identidade_igreja
     const { data: igr } = await supabase
       .from("identidade_igreja").select("id").eq("ativa", true).maybeSingle();
     if (!igr?.id) { toast.error("Nenhuma identidade da igreja configurada."); setSavingEst(false); return; }
@@ -368,9 +403,9 @@ export default function DocumentosAdmin() {
           </TabsList>
         </Tabs>
 
+        {/* ─── Aba: Estrutura Derivada ─── */}
         {abaAtiva === "estrutura" && (
           <div>
-            {/* Cabeçalho da aba estrutura */}
             <div className="rounded-md border border-gold/30 bg-gold/5 px-4 py-3 mb-5 flex items-start gap-2">
               <Info className="w-4 h-4 text-gold mt-0.5 shrink-0" />
               <div>
@@ -382,7 +417,6 @@ export default function DocumentosAdmin() {
               </div>
             </div>
 
-            {/* Filtros */}
             <div className="flex flex-wrap gap-2 mb-4">
               <button onClick={() => setFiltroTipoEst("todos")}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
@@ -465,101 +499,406 @@ export default function DocumentosAdmin() {
           </div>
         )}
 
-        {abaAtiva === "documentos" && <>
-        {/* Filtros por tipo */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            onClick={() => setTipoFiltro("todos")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
-              tipoFiltro === "todos"
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background border-border text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            Todos ({docs.length})
-          </button>
-          {TIPOS.filter(t => countsPorTipo[t.value] > 0).map(t => (
+        {/* ─── Aba: Documentos ─── */}
+        {abaAtiva === "documentos" && (
+          <>
+          {/* Filtros por tipo */}
+          <div className="flex flex-wrap gap-2 mb-6">
             <button
-              key={t.value}
-              onClick={() => setTipoFiltro(t.value)}
+              onClick={() => setTipoFiltro("todos")}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
-                tipoFiltro === t.value
+                tipoFiltro === "todos"
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background border-border text-muted-foreground hover:bg-muted"
               }`}
             >
-              {t.label} ({countsPorTipo[t.value]})
+              Todos ({docs.length})
             </button>
-          ))}
-        </div>
+            {TIPOS.filter(t => countsPorTipo[t.value] > 0).map(t => (
+              <button
+                key={t.value}
+                onClick={() => setTipoFiltro(t.value)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
+                  tipoFiltro === t.value
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-border text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {t.label} ({countsPorTipo[t.value]})
+              </button>
+            ))}
+          </div>
 
-        {/* Lista de documentos */}
-        {loading ? (
-          <div className="flex items-center justify-center h-32 text-muted-foreground">
-            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Carregando…
-          </div>
-        ) : docsFiltrados.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">Nenhum documento encontrado.</p>
-            <Button className="mt-3" onClick={() => { setEditingDocId(null); setFormDoc(emptyDoc); setDocOpen(true); }}>
-              <Plus className="w-4 h-4 mr-2" /> Criar primeiro documento
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {docsFiltrados.map(d => {
-              const meta = tipoMeta(d.tipo);
-              const isOpen = secaoDocId === d.id;
-              return (
-                <Card key={d.id} className="shadow-card-soft overflow-hidden">
-                  <CardContent className="p-0">
-                    {/* Cabeçalho do documento */}
-                    <div className="p-4 flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                        <FileText className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <Badge variant="outline" className={`text-[10px] ${meta.color}`}>{meta.label}</Badge>
-                          <span className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5">v{d.versao}</span>
-                          {d.vigente && (
-                            <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-500/30 gap-1">
-                              <CheckCircle2 className="w-2.5 h-2.5" /> Vigente
-                            </Badge>
+          {/* Lista de documentos */}
+          {loading ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" /> Carregando…
+            </div>
+          ) : docsFiltrados.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Nenhum documento encontrado.</p>
+              <Button className="mt-3" onClick={() => { setEditingDocId(null); setFormDoc(emptyDoc); setDocOpen(true); }}>
+                <Plus className="w-4 h-4 mr-2" /> Criar primeiro documento
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {docsFiltrados.map(d => {
+                const meta = tipoMeta(d.tipo);
+                const isOpen = secaoDocId === d.id;
+                return (
+                  <Card key={d.id} className="shadow-card-soft overflow-hidden">
+                    <CardContent className="p-0">
+                      {/* Cabeçalho do documento */}
+                      <div className="p-4 flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                          <FileText className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <Badge variant="outline" className={`text-[10px] ${meta.color}`}>{meta.label}</Badge>
+                            <span className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5">v{d.versao}</span>
+                            {d.vigente && (
+                              <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-500/30 gap-1">
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Vigente
+                              </Badge>
+                            )}
+                          </div>
+                          <h3 className="font-medium leading-tight">{d.titulo}</h3>
+                          {d.aprovado_por && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Aprovado por {d.aprovado_por}
+                              {d.aprovado_em && ` em ${new Date(d.aprovado_em).toLocaleDateString("pt-BR")}`}
+                            </p>
+                          )}
+                          {d.conteudo && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{d.conteudo}</p>
                           )}
                         </div>
-                        <h3 className="font-medium leading-tight">{d.titulo}</h3>
-                        {d.aprovado_por && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Aprovado por {d.aprovado_por}
-                            {d.aprovado_em && ` em ${new Date(d.aprovado_em).toLocaleDateString("pt-BR")}`}
-                          </p>
-                        )}
-                        {d.conteudo && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{d.conteudo}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {!d.vigente && (
-                          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => marcarVigente(d)}>
-                            <Clock className="w-3 h-3 mr-1" /> Marcar vigente
+                        <div className="flex items-center gap-1 shrink-0">
+                          {!d.vigente && (
+                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => marcarVigente(d)}>
+                              <Clock className="w-3 h-3 mr-1" /> Marcar vigente
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver histórico" onClick={() => abrirHistorico(d)}>
+                            <History className="w-3.5 h-3.5" />
                           </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEditDoc(d)}>
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost" size="icon" className="h-7 w-7"
-                          onClick={() => isOpen ? setSecaoDocId(null) : abrirSecoes(d.id)}
-                        >
-                          {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEditDoc(d)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost" size="icon" className="h-7 w-7"
+                            onClick={() => isOpen ? setSecaoDocId(null) : abrirSecoes(d.id)}
+                          >
+                            {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Painel de seções (expansível) */}
-                    {isOpen && (
-                      <div className="border-t bg-muted/30 px-4 py-3">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="text-xs font-medium text-muted-foregro
+                      {/* Painel de seções (expansível) */}
+                      {isOpen && (
+                        <div className="border-t bg-muted/30 px-4 py-3">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-xs font-medium text-muted-foreground">
+                              <BookOpen className="w-3.5 h-3.5 inline mr-1" />
+                              Seções de "{docAtual?.titulo}"
+                            </p>
+                            <Button size="sm" className="h-7 text-xs"
+                              onClick={() => { setEditingSecaoId(null); setFormSecao(emptySecao); setSecaoOpen(true); }}>
+                              <Plus className="w-3 h-3 mr-1" /> Adicionar seção
+                            </Button>
+                          </div>
+                          {loadingSecoes ? (
+                            <div className="flex items-center text-muted-foreground text-xs py-2">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> Carregando seções…
+                            </div>
+                          ) : secoes.length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-2 text-center">
+                              Nenhuma seção cadastrada. Adicione trechos do documento para busca inteligente.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {secoes.map(s => (
+                                <div key={s.id} className="flex items-start gap-2 bg-background rounded-md border px-3 py-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <span className="text-xs font-medium truncate">{s.titulo}</span>
+                                      {s.tipo_secao && (
+                                        <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded border shrink-0">
+                                          {TIPOS_SECAO.find(t => t.value === s.tipo_secao)?.label ?? s.tipo_secao}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {s.conteudo && (
+                                      <p className="text-[11px] text-muted-foreground line-clamp-2">{s.conteudo}</p>
+                                    )}
+                                    {s.palavras_chave?.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {s.palavras_chave.map((kw, i) => (
+                                          <span key={i} className="text-[10px] bg-primary/5 border border-primary/20 rounded px-1">{kw}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-1 shrink-0">
+                                    <button onClick={() => startEditSecao(s)}
+                                      className="w-6 h-6 flex items-center justify-center rounded hover:bg-muted">
+                                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                                    </button>
+                                    <button onClick={() => excluirSecao(s.id)}
+                                      className="w-6 h-6 flex items-center justify-center rounded hover:bg-destructive/10">
+                                      <Trash2 className="w-3 h-3 text-destructive" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+          </>
+        )}
+      </div>
+
+      {/* ─── Dialog: Documento ─── */}
+      <Dialog open={docOpen} onOpenChange={(o) => { setDocOpen(o); if (!o) { setEditingDocId(null); setFormDoc(emptyDoc); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl">{editingDocId ? "Editar documento" : "Novo documento"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={salvarDoc} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Tipo *</Label>
+                <Select value={formDoc.tipo} onValueChange={v => setFormDoc({ ...formDoc, tipo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TIPOS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Versão *</Label>
+                <Input required value={formDoc.versao} onChange={e => setFormDoc({ ...formDoc, versao: e.target.value })} placeholder="1.0" />
+              </div>
+            </div>
+            <div>
+              <Label>Título *</Label>
+              <Input required value={formDoc.titulo} onChange={e => setFormDoc({ ...formDoc, titulo: e.target.value })} />
+            </div>
+            <div>
+              <Label>Descrição / Ementa</Label>
+              <Textarea rows={3} value={formDoc.conteudo} onChange={e => setFormDoc({ ...formDoc, conteudo: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Aprovado por</Label>
+                <Input value={formDoc.aprovado_por} onChange={e => setFormDoc({ ...formDoc, aprovado_por: e.target.value })} />
+              </div>
+              <div>
+                <Label>Data de aprovação</Label>
+                <Input type="date" value={formDoc.aprovado_em} onChange={e => setFormDoc({ ...formDoc, aprovado_em: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <Label>URL do arquivo (opcional)</Label>
+              <Input value={formDoc.arquivo_url} onChange={e => setFormDoc({ ...formDoc, arquivo_url: e.target.value })} placeholder="https://…" />
+            </div>
+            <div className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
+              <div>
+                <Label className="text-sm">Documento Vigente</Label>
+                <p className="text-xs text-muted-foreground">Marcar como versão oficial atual deste tipo</p>
+              </div>
+              <Switch checked={formDoc.vigente} onCheckedChange={v => setFormDoc({ ...formDoc, vigente: v })} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDocOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={savingDoc}>
+                {savingDoc ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />Salvando…</> : (editingDocId ? "Atualizar" : "Salvar")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog: Seção ─── */}
+      <Dialog open={secaoOpen} onOpenChange={(o) => { setSecaoOpen(o); if (!o) { setEditingSecaoId(null); setFormSecao(emptySecao); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl">{editingSecaoId ? "Editar seção" : "Nova seção"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={salvarSecao} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <Label>Título *</Label>
+                <Input required value={formSecao.titulo} onChange={e => setFormSecao({ ...formSecao, titulo: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Tipo de seção</Label>
+                <Select value={formSecao.tipo_secao} onValueChange={v => setFormSecao({ ...formSecao, tipo_secao: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_SECAO.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Ordem</Label>
+                <Input type="number" value={formSecao.ordem} onChange={e => setFormSecao({ ...formSecao, ordem: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <Label>Conteúdo</Label>
+              <Textarea rows={4} value={formSecao.conteudo} onChange={e => setFormSecao({ ...formSecao, conteudo: e.target.value })} />
+            </div>
+            <div>
+              <Label>Referência a ministério</Label>
+              <Input value={formSecao.ministerio_ref} onChange={e => setFormSecao({ ...formSecao, ministerio_ref: e.target.value })} placeholder="Nome do ministério mencionado" />
+            </div>
+            <div>
+              <Label>Palavras-chave (separadas por vírgula)</Label>
+              <Input value={formSecao.palavras_chave} onChange={e => setFormSecao({ ...formSecao, palavras_chave: e.target.value })} placeholder="louvor, jovens, missões…" />
+            </div>
+            <div>
+              <Label>Nível hierárquico</Label>
+              <Input type="number" value={formSecao.nivel_hierarquico} onChange={e => setFormSecao({ ...formSecao, nivel_hierarquico: e.target.value })} placeholder="1, 2, 3…" />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setSecaoOpen(false)}>Cancelar</Button>
+              <Button type="submit">{editingSecaoId ? "Atualizar" : "Salvar"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog: Estrutura ─── */}
+      <Dialog open={estOpen} onOpenChange={(o) => { setEstOpen(o); if (!o) { setEditingEstId(null); setFormEst(emptyEst); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl">{editingEstId ? "Editar item" : "Novo item da estrutura"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={salvarEstrutura} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Tipo *</Label>
+                <Select value={formEst.tipo} onValueChange={v => setFormEst({ ...formEst, tipo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_ESTRUTURA.map(t => <SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Nível *</Label>
+                <Select value={formEst.nivel} onValueChange={v => setFormEst({ ...formEst, nivel: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {NIVEIS_ESTRUTURA.map(n => <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2">
+                <Label>Nome *</Label>
+                <Input required value={formEst.nome} onChange={e => setFormEst({ ...formEst, nome: e.target.value })} />
+              </div>
+              <div>
+                <Label>Ordem</Label>
+                <Input type="number" value={formEst.ordem} onChange={e => setFormEst({ ...formEst, ordem: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <Label>Descrição</Label>
+              <Textarea rows={2} value={formEst.descricao} onChange={e => setFormEst({ ...formEst, descricao: e.target.value })} />
+            </div>
+            <div>
+              <Label>Responsabilidades</Label>
+              <Textarea rows={2} value={formEst.responsabilidades} onChange={e => setFormEst({ ...formEst, responsabilidades: e.target.value })} />
+            </div>
+            <div>
+              <Label>Base institucional (ex: Art. 15 do Regimento)</Label>
+              <Input value={formEst.base_institucional} onChange={e => setFormEst({ ...formEst, base_institucional: e.target.value })} />
+            </div>
+            <div>
+              <Label>Referência no documento</Label>
+              <Input value={formEst.referencia_documento} onChange={e => setFormEst({ ...formEst, referencia_documento: e.target.value })} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEstOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={savingEst}>
+                {savingEst ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />Salvando…</> : (editingEstId ? "Atualizar" : "Salvar")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog: Histórico ─── */}
+      <Dialog open={!!histDoc} onOpenChange={(o) => { if (!o) { setHistDoc(null); setHistorico([]); } }}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl flex items-center gap-2">
+              <History className="w-5 h-5 text-primary" />
+              Histórico — {histDoc?.titulo}
+            </DialogTitle>
+          </DialogHeader>
+          {loadingHist ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" /> Carregando…
+            </div>
+          ) : historico.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <History className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Nenhum registro de histórico ainda.</p>
+              <p className="text-xs mt-1">As alterações futuras serão registradas aqui.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {historico.map(h => (
+                <div key={h.id} className="rounded-md border bg-background px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="text-xs font-semibold text-foreground">
+                        {ACAO_LABELS[h.acao] ?? h.acao}
+                      </span>
+                      {(h.versao_de || h.versao_para) && (
+                        <span className="text-[10px] text-muted-foreground ml-2">
+                          {h.versao_de && <>v{h.versao_de}</>}
+                          {h.versao_de && h.versao_para && " → "}
+                          {h.versao_para && <>v{h.versao_para}</>}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {new Date(h.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  {h.usuario_email && (
+                    <p className="text-[11px] text-muted-foreground mt-0.5">por {h.usuario_email}</p>
+                  )}
+                  {h.observacao && (
+                    <p className="text-xs text-muted-foreground mt-1 italic">"{h.observacao}"</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setHistDoc(null); setHistorico([]); }}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
