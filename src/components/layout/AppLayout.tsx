@@ -14,6 +14,7 @@ import {
   BarChart2,
   Building2,
   KeyRound,
+  ShieldAlert,
 } from "lucide-react";
 import { BrandMark } from "@/components/Brand";
 import { useEffect } from "react";
@@ -44,6 +45,7 @@ const pageTitles: Record<string, string> = {
   "/painel-estrategico": "Crescimento",
   "/organograma": "Organograma",
   "/admin/recuperacao-senha": "Recuperação de Senhas",
+  "/admin/lgpd": "Painel LGPD",
 };
 
 export default function AppLayout() {
@@ -125,6 +127,19 @@ export default function AppLayout() {
             >
               <KeyRound className="w-4 h-4" />
               <span translate="no">Recuperação de Senhas</span>
+            </NavLink>
+            <NavLink
+              to="/admin/lgpd"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-gold"
+                    : "hover:bg-sidebar-accent/60 text-sidebar-foreground/80"
+                }`
+              }
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span translate="no">Painel LGPD</span>
             </NavLink>
           </div>
         )}

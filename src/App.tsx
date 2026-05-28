@@ -16,6 +16,7 @@ import Visitantes from "./pages/Visitantes.tsx";
 import PainelEstrategico from "./pages/PainelEstrategico.tsx";
 import Organograma from "./pages/Organograma.tsx";
 import RecuperacaoSenhaAdmin from "./pages/RecuperacaoSenhaAdmin.tsx";
+import LgpdAdmin from "./pages/LgpdAdmin.tsx";
 import AgendaPrint from "./pages/AgendaPrint.tsx";
 import { AuthProvider } from "./hooks/useAuth.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
@@ -47,6 +48,7 @@ const App = () => (
                   <Route path="/painel-estrategico" element={<PainelEstrategico />} />
                   <Route path="/organograma" element={<Organograma />} />
                   <Route path="/admin/recuperacao-senha" element={<RecuperacaoSenhaAdmin />} />
+                  <Route path="/admin/lgpd" element={<LgpdAdmin />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

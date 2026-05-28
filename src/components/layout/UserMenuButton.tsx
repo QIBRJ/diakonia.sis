@@ -18,6 +18,7 @@ import {
   HeartHandshake,
   ShieldCheck,
   KeyRound,
+  ShieldAlert,
 } from "lucide-react";
 
 /**
@@ -160,6 +161,13 @@ export function UserMenuButton() {
             >
               <KeyRound className="w-4 h-4 text-muted-foreground" />
               <span>Recuperação de Senhas</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2 cursor-pointer py-2.5"
+              onClick={() => navigate("/admin/lgpd")}
+            >
+              <ShieldAlert className="w-4 h-4 text-muted-foreground" />
+              <span>Painel LGPD</span>
             </DropdownMenuItem>
           </>
         )}
