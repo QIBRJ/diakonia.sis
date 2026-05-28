@@ -37,8 +37,11 @@ export function UserMenuButton() {
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (data?.nome) setNome(data.nome.split(" ")[0]);
-        else if (user.email) setNome(user.email.split("@")[0]);
+        // Se profiles.nome contiver "@", trata como email e extrai só o login
+        const raw = data?.nome || user.email || "";
+        const base = raw.includes("@") ? raw.split("@")[0] : raw;
+        const primeiro = base.split(" ")[0];
+        setNome(primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase());
       });
   }, [user]);
 

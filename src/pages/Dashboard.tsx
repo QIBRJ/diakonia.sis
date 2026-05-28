@@ -27,16 +27,20 @@ export default function Dashboard() {
   const [openVisitanteRapido, setOpenVisitanteRapido] = useState(false);
   const verse = verseOfTheDay();
 
+  // Extrai primeiro nome humano — ignora se o campo contiver @
+  const extrairNome = (valor: string | null | undefined): string => {
+    if (!valor) return "";
+    const v = valor.includes("@") ? valor.split("@")[0] : valor;
+    const primeiro = v.split(" ")[0];
+    return primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase();
+  };
+
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle()
       .then(({ data }) => {
-        if (data?.nome) {
-          setNome(data.nome.split(" ")[0]);
-        } else if (user.email) {
-          // fallback: usar parte do email antes do @
-          setNome(user.email.split("@")[0]);
-        }
+        const nomeExtraido = extrairNome(data?.nome) || extrairNome(user.email);
+        setNome(nomeExtraido);
       });
   }, [user]);
 
