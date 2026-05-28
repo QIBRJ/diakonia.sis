@@ -1,6 +1,6 @@
 // ============================================================
-// Auth.tsx — Tela de Login com UX humanizada
-// Diakonia App — Sistema Ministerial
+// Auth.tsx — Tela de Login Ministerial
+// Diakonia App — Sistema de Gestão da Igreja
 // ============================================================
 
 import { useState, useEffect, useRef } from "react";
@@ -17,11 +17,48 @@ import { Eye, EyeOff, Loader2, Mail, Lock, ArrowLeft, CheckCircle2, User } from 
 // ── Tipos de tela ─────────────────────────────────────────────
 type Tela = "login" | "cadastro" | "recuperar" | "recuperar_ok";
 
-// ── Mensagens amigáveis ───────────────────────────────────────
+// ── Versículos de boas-vindas ──────────────────────────────────
+const VERSICULOS = [
+  { texto: "Porque sou eu que conheço os planos que tenho para vocês — planos de fazê-los prosperar e não de causar dano, planos de dar a vocês esperança e um futuro.", ref: "Jeremias 29:11" },
+  { texto: "O Senhor é o meu pastor; nada me faltará.", ref: "Salmos 23:1" },
+  { texto: "Tudo posso naquele que me fortalece.", ref: "Filipenses 4:13" },
+  { texto: "Vinde a mim, todos os que estais cansados e sobrecarregados, e eu vos aliviarei.", ref: "Mateus 11:28" },
+  { texto: "Pois Deus não nos deu um espírito de covardia, mas de poder, de amor e de equilíbrio.", ref: "2 Timóteo 1:7" },
+  { texto: "Confie no Senhor de todo o seu coração e não se apoie em seu próprio entendimento.", ref: "Provérbios 3:5" },
+  { texto: "O Senhor está perto de todos os que o invocam, de todos os que o invocam em verdade.", ref: "Salmos 145:18" },
+  { texto: "Aquele que habita no esconderijo do Altíssimo, à sombra do Onipotente descansará.", ref: "Salmos 91:1" },
+  { texto: "Porque Deus amou o mundo de tal maneira que deu o seu Filho unigênito.", ref: "João 3:16" },
+  { texto: "Buscai primeiro o Reino de Deus e a sua justiça, e todas as demais coisas vos serão acrescentadas.", ref: "Mateus 6:33" },
+  { texto: "O Senhor te abençoe e te guarde; o Senhor faça resplandecer o seu rosto sobre ti.", ref: "Números 6:24-25" },
+  { texto: "Em tudo dai graças, porque esta é a vontade de Deus em Cristo Jesus para convosco.", ref: "1 Tessalonicenses 5:18" },
+];
+
+function getVersiculo() {
+  const idx = Math.floor(Math.random() * VERSICULOS.length);
+  return VERSICULOS[idx];
+}
+
+// ── Saudação por horário ───────────────────────────────────────
+function getSaudacao(): string {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 12) return "Bom dia";
+  if (h >= 12 && h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+// ── Mensagem de recuperação por horário ───────────────────────
+function getMensagemRecuperacao(): string {
+  const h = new Date().getHours();
+  const saudacao = getSaudacao();
+  const periodo = h >= 5 && h < 18 ? "hoje" : "nessa noite";
+  return `${saudacao}! A Equipe Diakonia enviou um link de redefinição para o seu e-mail. Caso não encontre, verifique a pasta de spam — estamos aqui para ajudar ${periodo} 💙`;
+}
+
+// ── Mensagens de erro humanizadas ─────────────────────────────
 const ERROS: Record<string, string> = {
-  "Invalid login credentials":    "E-mail ou senha incorretos 😕 Tente novamente.",
+  "Invalid login credentials":    "E-mail ou senha incorretos 😕 Verifique seus dados.",
   "Email not confirmed":          "Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.",
-  "User already registered":      "Este e-mail já está cadastrado. Tente entrar.",
+  "User already registered":      "Este e-mail já possui uma conta. Tente entrar.",
   "Password should be at least 6 characters": "A senha precisa ter no mínimo 6 caracteres.",
   "Unable to validate email address: invalid format": "Digite um e-mail válido.",
   "For security purposes, you can only request this once every 60 seconds":
@@ -32,13 +69,13 @@ function traduzirErro(msg: string): string {
   for (const [chave, traduzido] of Object.entries(ERROS)) {
     if (msg.includes(chave)) return traduzido;
   }
-  return "Algo deu errado 😕 Verifique seus dados ou peça ajuda à equipe.";
+  return "Algo deu errado 😕 Tente novamente ou fale com a equipe.";
 }
 
-// ── Componente de campo com ícone ─────────────────────────────
+// ── Campo com ícone ────────────────────────────────────────────
 function Campo({
-  id, label, type, value, onChange, icon, placeholder, autoFocus, required, minLength,
-  sufixo,
+  id, label, type, value, onChange, icon, placeholder,
+  autoFocus, required, minLength, sufixo,
 }: {
   id: string; label: string; type: string; value: string;
   onChange: (v: string) => void; icon: React.ReactNode; placeholder?: string;
@@ -46,239 +83,200 @@ function Campo({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-sm font-medium">{label}</Label>
+      <Label htmlFor={id} className="text-sm font-medium text-foreground/80">{label}</Label>
       <div className="relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
           {icon}
         </span>
         <Input
-          id={id}
-          type={type}
-          value={value}
+          id={id} type={type} value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          autoFocus={autoFocus}
-          required={required}
-          minLength={minLength}
-          className="pl-9 pr-10 h-11"
+          placeholder={placeholder} autoFocus={autoFocus}
+          required={required} minLength={minLength}
+          className="pl-9 pr-10 h-11 bg-background/80 border-border/70 focus:border-gold/60 transition-colors"
         />
         {sufixo && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2">
-            {sufixo}
-          </span>
+          <span className="absolute right-3 top-1/2 -translate-y-1/2">{sufixo}</span>
         )}
       </div>
     </div>
   );
 }
 
-// ── Componente Principal ──────────────────────────────────────
+// ── Componente Principal ───────────────────────────────────────
 export default function Auth() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
-  // Estado geral
-  const [tela, setTela]           = useState<Tela>("login");
-  const [email, setEmail]         = useState(() => localStorage.getItem("diakonia_email") ?? "");
-  const [senha, setSenha]         = useState("");
-  const [nome, setNome]           = useState("");
-  const [verSenha, setVerSenha]   = useState(false);
-  const [lembrar, setLembrar]     = useState(!!localStorage.getItem("diakonia_email"));
-  const [busy, setBusy]           = useState(false);
-  const [erroMsg, setErroMsg]     = useState<string | null>(null);
+  const [tela, setTela]         = useState<Tela>("login");
+  const [email, setEmail]       = useState(() => localStorage.getItem("diakonia_email") ?? "");
+  const [senha, setSenha]       = useState("");
+  const [nome, setNome]         = useState("");
+  const [verSenha, setVerSenha] = useState(false);
+  const [lembrar, setLembrar]   = useState(!!localStorage.getItem("diakonia_email"));
+  const [busy, setBusy]         = useState(false);
+  const [erroMsg, setErroMsg]   = useState<string | null>(null);
+  const [versiculo]             = useState(getVersiculo);
   const emailRef = useRef<HTMLInputElement>(null);
 
-  // Redirecionar se já logado
   useEffect(() => {
     if (!loading && user) navigate("/", { replace: true });
   }, [user, loading, navigate]);
 
-  // Limpar erro ao trocar campo
   useEffect(() => { setErroMsg(null); }, [email, senha]);
 
-  // ── Login ────────────────────────────────────────────────────
+  // ── Login ──────────────────────────────────────────────────
   const onSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErroMsg(null);
     setBusy(true);
-
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(), password: senha,
+    });
     setBusy(false);
-
-    if (error) {
-      setErroMsg(traduzirErro(error.message));
-      return;
-    }
-
-    if (lembrar) {
-      localStorage.setItem("diakonia_email", email.trim());
-    } else {
-      localStorage.removeItem("diakonia_email");
-    }
-
-    toast.success("Bem-vindo(a)! 🙏");
+    if (error) { setErroMsg(traduzirErro(error.message)); return; }
+    if (lembrar) localStorage.setItem("diakonia_email", email.trim());
+    else         localStorage.removeItem("diakonia_email");
+    toast.success(`${getSaudacao()}! Seja bem-vindo(a) 🙏`);
     navigate("/");
   };
 
-  // ── Cadastro ─────────────────────────────────────────────────
+  // ── Cadastro ───────────────────────────────────────────────
   const onSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErroMsg(null);
     setBusy(true);
-
     const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password: senha,
+      email: email.trim(), password: senha,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
         data: { nome: nome.trim() },
       },
     });
     setBusy(false);
-
-    if (error) {
-      setErroMsg(traduzirErro(error.message));
-      return;
-    }
-
+    if (error) { setErroMsg(traduzirErro(error.message)); return; }
     toast.success("Conta criada! Verifique seu e-mail para confirmar o acesso.");
-    setSenha("");
-    setTela("login");
+    setSenha(""); setTela("login");
   };
 
-  // ── Recuperação de senha ──────────────────────────────────────
+  // ── Recuperação de senha ───────────────────────────────────
   const onRecuperar = async (e: React.FormEvent) => {
     e.preventDefault();
     setErroMsg(null);
-    if (!email.trim()) {
-      setErroMsg("Digite seu e-mail para continuar.");
-      return;
-    }
+    if (!email.trim()) { setErroMsg("Digite seu e-mail para continuar."); return; }
     setBusy(true);
-
-    // 1. Dispara reset via Supabase
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/auth/reset`,
     });
-
-    // 2. Registra solicitação na tabela (mesmo se o email não existir,
-    //    para não revelar se o cadastro existe)
     const { data: pessoa } = await supabase
-      .from("membros")
-      .select("id, nome_completo")
-      .eq("email", email.trim())
-      .maybeSingle();
-
+      .from("membros").select("id, nome_completo")
+      .eq("email", email.trim()).maybeSingle();
     await supabase.from("recuperacao_senha").insert({
-      email:     email.trim(),
-      nome:      pessoa?.nome_completo ?? null,
+      email: email.trim(),
+      nome: pessoa?.nome_completo ?? null,
       pessoa_id: pessoa?.id ?? null,
-      status:    "pendente",
+      status: "pendente",
     });
-
     setBusy(false);
-
     if (error && !error.message.includes("For security purposes")) {
-      setErroMsg(traduzirErro(error.message));
-      return;
+      setErroMsg(traduzirErro(error.message)); return;
     }
-
     setTela("recuperar_ok");
   };
 
-  // ── Renderização ──────────────────────────────────────────────
-
-  // Ícone de ver/ocultar senha
+  // ── Botão ver/ocultar senha ────────────────────────────────
   const BotaoSenha = (
-    <button
-      type="button"
-      onClick={() => setVerSenha(v => !v)}
+    <button type="button" onClick={() => setVerSenha(v => !v)}
       className="text-muted-foreground hover:text-foreground transition-colors"
-      tabIndex={-1}
-      aria-label={verSenha ? "Ocultar senha" : "Mostrar senha"}
-    >
+      tabIndex={-1} aria-label={verSenha ? "Ocultar senha" : "Mostrar senha"}>
       {verSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
     </button>
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-hero p-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-hero p-4 relative overflow-hidden">
 
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <BrandMark className="text-5xl text-foreground" />
-          <p className="text-foreground/60 mt-2 text-xs tracking-[0.18em] uppercase">
-            Conectando pessoas, organizando o propósito
+      {/* Versículo de fundo — decorativo */}
+      <div className="absolute inset-0 flex items-end justify-center pb-6 pointer-events-none select-none">
+        <div className="max-w-lg text-center px-6 opacity-[0.06]">
+          <p className="text-3xl font-serif italic leading-relaxed text-foreground">
+            "{versiculo.texto}"
           </p>
+        </div>
+      </div>
+
+      <div className="w-full max-w-sm relative z-10">
+
+        {/* ── Logo ── */}
+        <div className="text-center mb-7">
+          <BrandMark className="text-[3.5rem] text-foreground inline-block" />
+          <p className="text-foreground/50 mt-2 text-[10px] tracking-[0.22em] uppercase font-medium">
+            Sistema de Gestão Ministerial
+          </p>
+        </div>
+
+        {/* ── Versículo dinâmico ── */}
+        <div className="mb-5 px-1">
+          <div className="bg-gold/8 border border-gold/20 rounded-xl px-4 py-3 text-center space-y-1">
+            <p className="text-[13px] text-foreground/75 font-serif italic leading-relaxed">
+              "{versiculo.texto}"
+            </p>
+            <p className="text-[11px] text-gold font-medium tracking-wide">
+              — {versiculo.ref}
+            </p>
+          </div>
         </div>
 
         {/* ── TELA: Login ── */}
         {tela === "login" && (
           <div className="bg-card rounded-2xl shadow-elevated border border-border/50 p-7 space-y-5">
             <div>
-              <h1 className="font-serif text-xl font-semibold">Bem-vindo(a) de volta 🙏</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <h1 className="font-serif text-xl font-semibold">
+                {getSaudacao()}! Que Deus abençoe sua jornada hoje 🙏
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
                 Entre com seu e-mail e senha para continuar.
               </p>
             </div>
 
             <form onSubmit={onSignIn} className="space-y-4">
-              <Campo
-                id="email" label="E-mail" type="email"
+              <Campo id="email" label="E-mail" type="email"
                 value={email} onChange={setEmail}
                 icon={<Mail className="w-4 h-4" />}
-                placeholder="seu@email.com"
-                autoFocus required
-              />
-              <Campo
-                id="senha" label="Senha" type={verSenha ? "text" : "password"}
+                placeholder="seu@email.com" autoFocus required />
+              <Campo id="senha" label="Senha"
+                type={verSenha ? "text" : "password"}
                 value={senha} onChange={setSenha}
                 icon={<Lock className="w-4 h-4" />}
-                placeholder="sua senha"
-                required sufixo={BotaoSenha}
-              />
+                placeholder="sua senha" required sufixo={BotaoSenha} />
 
-              {/* Lembrar email */}
               <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={lembrar}
+                <input type="checkbox" checked={lembrar}
                   onChange={e => setLembrar(e.target.checked)}
-                  className="rounded border-border w-3.5 h-3.5"
-                />
+                  className="rounded border-border w-3.5 h-3.5 accent-gold" />
                 Lembrar meu e-mail
               </label>
 
-              {/* Erro */}
               {erroMsg && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-2.5 text-sm text-destructive">
+                <div className="bg-destructive/8 border border-destructive/25 rounded-lg px-3 py-2.5 text-sm text-destructive">
                   {erroMsg}
                 </div>
               )}
 
-              <Button type="submit" className="w-full h-11 text-base gap-2" disabled={busy}>
-                {busy
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Entrando…</>
-                  : "Entrar"}
+              <Button type="submit" disabled={busy}
+                className="w-full h-11 text-base font-semibold bg-gold hover:bg-gold/90 text-white shadow-md">
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Entrar"}
               </Button>
             </form>
 
-            {/* Links */}
-            <div className="flex items-center justify-between text-xs">
-              <button
-                type="button"
-                onClick={() => { setTela("recuperar"); setErroMsg(null); setSenha(""); }}
-                className="text-muted-foreground hover:text-primary transition-colors underline underline-offset-4"
-              >
+            <div className="flex flex-col gap-2 pt-1">
+              <button onClick={() => { setTela("recuperar"); setErroMsg(null); setSenha(""); }}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline text-center">
                 Esqueci minha senha
               </button>
-              <button
-                type="button"
-                onClick={() => { setTela("cadastro"); setErroMsg(null); setSenha(""); }}
-                className="text-muted-foreground hover:text-primary transition-colors"
-              >
-                Criar conta →
+              <button onClick={() => { setTela("cadastro"); setErroMsg(null); setSenha(""); }}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline text-center">
+                Criar nova conta
               </button>
             </div>
           </div>
@@ -287,128 +285,124 @@ export default function Auth() {
         {/* ── TELA: Cadastro ── */}
         {tela === "cadastro" && (
           <div className="bg-card rounded-2xl shadow-elevated border border-border/50 p-7 space-y-5">
-            <button
-              type="button"
-              onClick={() => { setTela("login"); setErroMsg(null); }}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" /> Voltar para o login
-            </button>
-
-            <div>
-              <h1 className="font-serif text-xl font-semibold">Criar conta 💙</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Novas contas começam com acesso básico. Um administrador poderá ampliar seu perfil.
-              </p>
+            <div className="flex items-center gap-3">
+              <button onClick={() => { setTela("login"); setErroMsg(null); }}
+                className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <div>
+                <h1 className="font-serif text-xl font-semibold">Criar conta</h1>
+                <p className="text-sm text-muted-foreground">Preencha seus dados para solicitar acesso.</p>
+              </div>
             </div>
 
             <form onSubmit={onSignUp} className="space-y-4">
-              <Campo
-                id="nome" label="Seu nome completo" type="text"
+              <Campo id="nome" label="Seu nome completo" type="text"
                 value={nome} onChange={setNome}
                 icon={<User className="w-4 h-4" />}
-                placeholder="Nome como aparece na igreja"
-                autoFocus required
-              />
-              <Campo
-                id="email2" label="E-mail" type="email"
+                placeholder="Nome Sobrenome" autoFocus required />
+              <Campo id="email2" label="E-mail" type="email"
                 value={email} onChange={setEmail}
                 icon={<Mail className="w-4 h-4" />}
-                placeholder="seu@email.com" required
-              />
-              <Campo
-                id="senha2" label="Senha (mínimo 6 caracteres)" type={verSenha ? "text" : "password"}
+                placeholder="seu@email.com" required />
+              <Campo id="senha2" label="Senha (mínimo 6 caracteres)"
+                type={verSenha ? "text" : "password"}
                 value={senha} onChange={setSenha}
                 icon={<Lock className="w-4 h-4" />}
-                placeholder="escolha uma senha"
-                required minLength={6} sufixo={BotaoSenha}
-              />
+                placeholder="crie uma senha segura"
+                required minLength={6} sufixo={BotaoSenha} />
+
+              {/* Aviso de permissão */}
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg px-3 py-2.5">
+                <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                  ℹ️ Novas contas iniciam com acesso básico. Um administrador poderá ampliar seu perfil após a confirmação.
+                </p>
+              </div>
 
               {erroMsg && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-2.5 text-sm text-destructive">
+                <div className="bg-destructive/8 border border-destructive/25 rounded-lg px-3 py-2.5 text-sm text-destructive">
                   {erroMsg}
                 </div>
               )}
 
-              <Button type="submit" className="w-full h-11 gap-2" disabled={busy}>
-                {busy
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Criando…</>
-                  : "Criar minha conta"}
+              <Button type="submit" disabled={busy}
+                className="w-full h-11 text-base font-semibold bg-gold hover:bg-gold/90 text-white shadow-md">
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Criar conta"}
               </Button>
             </form>
           </div>
         )}
 
-        {/* ── TELA: Recuperar senha ── */}
+        {/* ── TELA: Esqueci senha ── */}
         {tela === "recuperar" && (
           <div className="bg-card rounded-2xl shadow-elevated border border-border/50 p-7 space-y-5">
-            <button
-              type="button"
-              onClick={() => { setTela("login"); setErroMsg(null); }}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" /> Voltar para o login
-            </button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => { setTela("login"); setErroMsg(null); }}
+                className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <div>
+                <h1 className="font-serif text-xl font-semibold">Recuperar acesso</h1>
+                <p className="text-sm text-muted-foreground">Informe seu e-mail e enviaremos um link.</p>
+              </div>
+            </div>
 
-            <div>
-              <h1 className="font-serif text-xl font-semibold">Recuperar acesso 🔑</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Digite o e-mail cadastrado. Enviaremos um link para criar uma nova senha e nossa equipe ficará ciente.
+            {/* Mensagem institucional */}
+            <div className="bg-gold/8 border border-gold/25 rounded-xl px-4 py-3 text-center">
+              <p className="text-sm text-foreground/80 leading-relaxed">
+                <span className="font-medium text-gold">{getSaudacao()}!</span> A Equipe Diakonia
+                enviará um link de redefinição para o seu e-mail.
+                Nossa equipe também será notificada para garantir que você recupere o acesso 💙
               </p>
             </div>
 
             <form onSubmit={onRecuperar} className="space-y-4">
-              <Campo
-                id="email3" label="E-mail cadastrado" type="email"
+              <Campo id="email3" label="Seu e-mail cadastrado" type="email"
                 value={email} onChange={setEmail}
                 icon={<Mail className="w-4 h-4" />}
-                placeholder="seu@email.com"
-                autoFocus required
-              />
+                placeholder="seu@email.com" autoFocus required />
 
               {erroMsg && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-2.5 text-sm text-destructive">
+                <div className="bg-destructive/8 border border-destructive/25 rounded-lg px-3 py-2.5 text-sm text-destructive">
                   {erroMsg}
                 </div>
               )}
 
-              <Button type="submit" className="w-full h-11 gap-2" disabled={busy}>
-                {busy
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando…</>
-                  : "Enviar link de recuperação"}
+              <Button type="submit" disabled={busy}
+                className="w-full h-11 text-base font-semibold bg-gold hover:bg-gold/90 text-white shadow-md">
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enviar link de redefinição"}
               </Button>
             </form>
           </div>
         )}
 
-        {/* ── TELA: Confirmação de recuperação ── */}
+        {/* ── TELA: Confirmação ── */}
         {tela === "recuperar_ok" && (
-          <div className="bg-card rounded-2xl shadow-elevated border border-border/50 p-7 space-y-5 text-center">
-            <CheckCircle2 className="w-12 h-12 text-success mx-auto" />
+          <div className="bg-card rounded-2xl shadow-elevated border border-border/50 p-7 text-center space-y-5">
+            <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-8 h-8 text-green-600" />
+            </div>
             <div className="space-y-2">
-              <h1 className="font-serif text-xl font-semibold">Solicitação enviada! 💙</h1>
+              <h1 className="font-serif text-xl font-semibold">Link enviado!</h1>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Enviamos um link de recuperação para{" "}
-                <span className="font-medium text-foreground">{email}</span>.<br />
-                Verifique sua caixa de entrada (e o spam 😊).
-              </p>
-              <p className="text-xs text-muted-foreground bg-muted rounded-lg px-4 py-3 leading-relaxed mt-3">
-                Nossa equipe também foi notificada e poderá te ajudar caso o link não chegue.
+                {getMensagemRecuperacao()}
               </p>
             </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => { setTela("login"); setSenha(""); setErroMsg(null); }}
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" /> Voltar ao login
+            <div className="bg-muted/50 rounded-lg px-4 py-3">
+              <p className="text-xs text-muted-foreground">
+                Não encontrou o e-mail? Verifique a pasta de <strong>spam</strong> ou aguarde alguns minutos.
+              </p>
+            </div>
+            <Button variant="outline" className="w-full"
+              onClick={() => { setTela("login"); setErroMsg(null); }}>
+              Voltar ao login
             </Button>
           </div>
         )}
 
-        {/* Rodapé */}
-        <p className="text-center text-[11px] text-foreground/40 mt-6">
-          Sistema ministerial · Diakonia App
+        {/* ── Rodapé institucional ── */}
+        <p className="text-center text-[10px] text-foreground/30 mt-6 tracking-wide">
+          DiakoniaApp.com.br · CNPJ 34.926.658/0001-40
         </p>
       </div>
     </div>
