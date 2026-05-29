@@ -16,7 +16,7 @@ import {
 import {
   Church, Save, Loader2, Plus, Trash2, Heart, Info,
   Globe, Building2, Link, ExternalLink, AlertTriangle,
-  CheckCircle2, Zap, Sparkles, User, X,
+  CheckCircle2, Zap, Sparkles, User, X, Pencil, Power,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -167,6 +167,8 @@ export default function IdentidadeAdmin() {
   const [identidade, setIdentidade] = useState<Identidade | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+const [editMode, setEditMode] = useState(false); // false = visualizar, true = editar
+const [togglingStatus, setTogglingStatus] = useState(false);
 
   // Formulário principal
   const [form, setForm] = useState({
@@ -570,7 +572,23 @@ export default function IdentidadeAdmin() {
     }
 
     setSaving(false);
-    toast.success("Identidade salva com sucesso!");
+    toast.success("Dados salvos com sucesso!");
+    setEditMode(false);
+    load();
+  };
+
+  // ── Toggle status ativa/inativa ──
+  const toggleAtiva = async () => {
+    if (!identidade) return;
+    setTogglingStatus(true);
+    const novoStatus = !identidade.ativa;
+    const { error } = await supabase
+      .from("identidade_igreja")
+      .update({ ativa: novoStatus })
+      .eq("id", identidade.id);
+    setTogglingStatus(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(novoStatus ? "Identidade ativada." : "Identidade inativada.");
     load();
   };
 
@@ -593,16 +611,72 @@ export default function IdentidadeAdmin() {
         title="Identidade da Igreja"
         description="Dados institucionais, digital e vínculos denominacionais"
         actions={
-          <Button onClick={salvar} disabled={saving}>
-            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-            Salvar tudo
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Botão Ativar/Inativar */}
+            {identidade && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={toggleAtiva}
+                disabled={togglingStatus}
+                className={identidade.ativa
+                  ? "border-orange-300 text-orange-600 hover:bg-orange-50"
+                  : "border-green-300 text-green-600 hover:bg-green-50"}
+              >
+                {togglingStatus
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                  : <Power className="w-3.5 h-3.5 mr-1" />}
+                {identidade.ativa ? "Inativar" : "Ativar"}
+              </Button>
+            )}
+            {/* Editar / Cancelar / Salvar */}
+            {!editMode ? (
+              <Button type="button" variant="outline" onClick={() => setEditMode(true)}>
+                <Pencil className="w-4 h-4 mr-2" /> Editar
+              </Button>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setEditMode(false); load(); }}
+                  disabled={saving}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={salvar} disabled={saving}>
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                  Salvar
+                </Button>
+              </>
+            )}
+          </div>
         }
       />
 
       <div className="p-4 md:p-8 space-y-6 max-w-2xl">
 
-        {/* ── 1. Dados Institucionais ── */}
+        {/* ── Banner de status ── */}
+          {identidade && !identidade.ativa && (
+            <div className="rounded-md border border-orange-200 bg-orange-50 dark:bg-orange-950/20 px-4 py-3 flex items-center gap-3">
+              <Power className="w-4 h-4 text-orange-500 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-orange-800 dark:text-orange-300">Identidade inativa</p>
+                <p className="text-xs text-orange-600 dark:text-orange-400">Esta identidade está inativada. Clique em "Ativar" para reativar.</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Modo visualização ── */}
+          {!editMode && identidade && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 px-4 py-2.5 flex items-center gap-2">
+              <Pencil className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <p className="text-sm text-blue-700 dark:text-blue-300">Modo visualização — clique em <strong>Editar</strong> para fazer alterações.</p>
+            </div>
+          )}
+
+          {/* ── 1. Dados Institucionais ── */}
         <Card className="shadow-card-soft">
           <CardHeader className="pb-3">
             <CardTitle className="font-serif flex items-center gap-2 text-lg">
@@ -616,7 +690,9 @@ export default function IdentidadeAdmin() {
               <Label>Nome da Igreja *</Label>
               <Input value={form.nome_igreja}
                 onChange={(e) => setForm({ ...form, nome_igreja: e.target.value })}
-                placeholder="Ex: Quarta Igreja Batista do Rio de Janeiro" />
+                placeholder="Ex: Quarta Igreja Batista do Rio de Janeiro"
+                readOnly={!editMode}
+                className={!editMode ? "bg-muted/30 cursor-default" : ""} />
             </div>
 
             {/* CNPJ + Fundada em */}
@@ -625,7 +701,9 @@ export default function IdentidadeAdmin() {
                 <Label>CNPJ</Label>
                 <Input value={form.cnpj}
                   onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
-                  placeholder="00.000.000/0001-00" />
+                  placeholder="00.000.000/0001-00"
+                  readOnly={!editMode}
+                  className={!editMode ? "bg-muted/30 cursor-default" : ""} />
               </div>
               <div>
                 <Label>Fundada em</Label>
@@ -652,7 +730,9 @@ export default function IdentidadeAdmin() {
               </div>
               <Textarea rows={3} value={form.missao}
                 onChange={(e) => setForm({ ...form, missao: e.target.value })}
-                placeholder="A missão da nossa igreja é…" className="resize-none" />
+                placeholder="A missão da nossa igreja é…"
+                readOnly={!editMode}
+                className={`resize-none ${!editMode ? "bg-muted/30 cursor-default" : ""}`} />
               {/* Origem documental */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground shrink-0">📄 Base:</span>
@@ -708,7 +788,9 @@ export default function IdentidadeAdmin() {
               </div>
               <Textarea rows={3} value={form.visao}
                 onChange={(e) => setForm({ ...form, visao: e.target.value })}
-                placeholder="Nossa visão é ser uma igreja que…" className="resize-none" />
+                placeholder="Nossa visão é ser uma igreja que…"
+                readOnly={!editMode}
+                className={`resize-none ${!editMode ? "bg-muted/30 cursor-default" : ""}`} />
               {/* Origem documental */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground shrink-0">📄 Base:</span>
@@ -776,10 +858,12 @@ export default function IdentidadeAdmin() {
                           placeholder="❤️" className="w-16 text-center text-lg px-1" />
                         <Input value={v.valor} onChange={(e) => updateValor(idx, "valor", e.target.value)}
                           placeholder="Ex: Amor, Fé, Integridade…" className="flex-1 font-medium" />
-                        <button type="button" onClick={() => removeValor(idx)}
-                          className="w-8 h-8 flex items-center justify-center rounded hover:bg-destructive/10 shrink-0">
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </button>
+                        {editMode && (
+                <button type="button" onClick={() => removeValor(idx)}
+                                          className="w-8 h-8 flex items-center justify-center rounded hover:bg-destructive/10 shrink-0">
+                                          <Trash2 className="w-4 h-4 text-destructive" />
+                                        </button>
+              )}
                       </div>
                       <Input value={v.descricao} onChange={(e) => updateValor(idx, "descricao", e.target.value)}
                         placeholder="Descrição opcional…" className="text-sm text-muted-foreground" />
@@ -789,9 +873,11 @@ export default function IdentidadeAdmin() {
               </div>
             )}
 
+            {editMode && (
             <Button type="button" variant="outline" className="w-full border-dashed gap-2" onClick={addValor}>
               <Plus className="w-4 h-4" /> Adicionar valor
             </Button>
+          )}
           </CardContent>
         </Card>
 
@@ -816,7 +902,8 @@ export default function IdentidadeAdmin() {
               value={form.resumo}
               onChange={(e) => setForm({ ...form, resumo: e.target.value })}
               placeholder="Breve apresentação da igreja, missão, atuação e contexto…"
-              className="resize-none"
+              readOnly={!editMode}
+              className={`resize-none ${!editMode ? "bg-muted/30 cursor-default" : ""}`}
             />
 
             {isAdmin && (
@@ -1030,9 +1117,11 @@ export default function IdentidadeAdmin() {
                   </div>
                 ))}
               </div>
+              {editMode && (
               <Button type="button" variant="outline" className="w-full border-dashed gap-2 mt-2" onClick={addRede}>
-                <Plus className="w-4 h-4" /> Adicionar rede social
-              </Button>
+                              <Plus className="w-4 h-4" /> Adicionar rede social
+                            </Button>
+            )}
             </div>
           </CardContent>
         </Card>
@@ -1110,7 +1199,7 @@ export default function IdentidadeAdmin() {
               </div>
             )}
 
-            {isAdmin && (
+            {isAdmin && editMode && (
               adicionandoInst ? (
                 <div className="rounded-md border p-4 space-y-3 bg-muted/20">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nova instituição personalizada</p>
@@ -1197,12 +1286,14 @@ export default function IdentidadeAdmin() {
         </Card>
 
         {/* Botão sticky mobile */}
+        {editMode && (
         <div className="sticky bottom-4 md:hidden">
-          <Button className="w-full shadow-elevated" onClick={salvar} disabled={saving}>
-            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-            Salvar tudo
-          </Button>
-        </div>
+                  <Button className="w-full shadow-elevated" onClick={salvar} disabled={saving}>
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                    Salvar tudo
+                  </Button>
+                </div>
+      )}
 
       </div>
     </div>
