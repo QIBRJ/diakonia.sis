@@ -4,9 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Pencil, Link2, Briefcase, Sparkles, BarChart3 } from "lucide-react";
+import { Plus, Search, Pencil, Link2, Briefcase, Sparkles, BarChart3, Phone, MessageCircle, Eye, Filter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,6 +15,7 @@ import { VinculosPessoaDialog } from "@/components/familias/VinculosPessoaDialog
 import AtuacoesDialog from "@/components/membros/AtuacoesDialog";
 import VisitanteDialog from "@/components/membros/VisitanteDialog";
 import { ListSkeleton, EmptyState, ErrorState } from "@/components/ListState";
+import { cn } from "@/lib/utils";
 
 export interface Membro {
   id: string;
@@ -46,7 +46,6 @@ export interface Membro {
     | "professor_ebd"
     | "voluntario"
     | "membro";
-  // Campos de acolhimento (M25)
   status_acolhimento?: string | null;
   responsavel_id?: string | null;
   como_conheceu?: string | null;
@@ -75,16 +74,15 @@ const tipoPessoaColor: Record<string, string> = {
   ex_membro: "bg-muted text-muted-foreground border-border",
 };
 
-const perfilAcessoLabel: Record<string, string> = {
-  admin: "Admin",
-  pastor: "Pastor",
-  secretaria: "Secretaria",
-  tesoureiro: "Tesoureiro",
-  lideranca: "Liderança",
-  professor_ebd: "Professor EBD",
-  voluntario: "Voluntário",
-  membro: "Membro",
-};
+// Iniciais do nome (máx 2 letras)
+function initials(name: string) {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
+}
 
 export default function Membros() {
   const { canEdit, hasRole } = useAuth();
@@ -95,6 +93,7 @@ export default function Membros() {
   const [editing, setEditing] = useState<Membro | null>(null);
   const [tipoFiltro, setTipoFiltro] = useState<string>("todos");
   const [perfilFiltro, setPerfilFiltro] = useState<string>("todos");
+  const [showFilters, setShowFilters] = useState(false);
   const [vinculosPessoa, setVinculosPessoa] = useState<Membro | null>(null);
   const [atuacoesPessoa, setAtuacoesPessoa] = useState<Membro | null>(null);
   const [visitantePessoa, setVisitantePessoa] = useState<Membro | null>(null);
@@ -123,9 +122,7 @@ export default function Membros() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const filtered = membros.filter((m) => {
     const q = search.toLowerCase();
@@ -139,43 +136,65 @@ export default function Membros() {
     return matchSearch && matchTipo && matchPerfil;
   });
 
+  const hasActiveFilters = tipoFiltro !== "todos" || perfilFiltro !== "todos";
+
   return (
     <div>
       <PageHeader
         title="Pessoas"
-        description={`${membros.length} cadastrados • ${membros.filter((m) => m.status === "ativo").length} ativos`}
+        description={`${membros.length} cadastrados · ${membros.filter((m) => m.status === "ativo").length} ativos`}
         actions={
           canEdit && (
             <div className="flex gap-2">
               <Button
-                onClick={() => {
-                  setEditing(null);
-                  setOpen(true);
-                }}
-                className="gap-2"
+                onClick={() => { setEditing(null); setOpen(true); }}
+                size="sm"
+                className="gap-1.5"
               >
                 <Plus className="w-4 h-4" /> Nova pessoa
               </Button>
-              <Button asChild variant="outline" className="gap-2">
+              <Button asChild variant="outline" size="sm" className="gap-1.5 hidden md:inline-flex">
                 <Link to="/visitantes"><BarChart3 className="w-4 h-4" /> <span translate="no">Painel</span></Link>
               </Button>
             </div>
           )
         }
       />
-      <div className="p-4 md:p-8 space-y-4">
-        <div className="flex flex-col md:flex-row gap-3 md:items-center">
-          <div className="relative max-w-md flex-1">
+
+      <div className="p-4 md:p-8 space-y-3">
+
+        {/* ── Barra de busca + filtros ── */}
+        <div className="flex gap-2 items-center">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              className="pl-9"
+              className="pl-9 h-11"
               placeholder="Buscar por nome, CPF ou bairro..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          {/* Botão de filtros mobile */}
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className={cn(
+              "md:hidden w-11 h-11 rounded-lg border flex items-center justify-center shrink-0 transition-colors",
+              hasActiveFilters
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-card border-border text-muted-foreground"
+            )}
+          >
+            <Filter className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Filtros desktop sempre visíveis / mobile toggle */}
+        <div className={cn(
+          "flex-col md:flex-row gap-2 md:items-center",
+          showFilters ? "flex" : "hidden md:flex"
+        )}>
           <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
-            <SelectTrigger className="md:w-56">
+            <SelectTrigger className="md:w-48 h-11">
               <SelectValue placeholder="Tipo de pessoa" />
             </SelectTrigger>
             <SelectContent>
@@ -187,7 +206,7 @@ export default function Membros() {
             </SelectContent>
           </Select>
           <Select value={perfilFiltro} onValueChange={setPerfilFiltro}>
-            <SelectTrigger className="md:w-56">
+            <SelectTrigger className="md:w-48 h-11">
               <SelectValue placeholder="Perfil de Acesso" />
             </SelectTrigger>
             <SelectContent>
@@ -202,88 +221,135 @@ export default function Membros() {
               <SelectItem value="membro">Membro</SelectItem>
             </SelectContent>
           </Select>
+          {hasActiveFilters && (
+            <button
+              onClick={() => { setTipoFiltro("todos"); setPerfilFiltro("todos"); }}
+              className="text-xs text-muted-foreground underline underline-offset-2 md:ml-1"
+            >
+              Limpar filtros
+            </button>
+          )}
         </div>
 
+        {/* ── Lista ── */}
         {loading ? (
-          <ListSkeleton className="grid gap-3" count={5} />
+          <ListSkeleton className="space-y-2" count={6} />
         ) : error ? (
           <ErrorState onRetry={load} />
         ) : filtered.length === 0 ? (
           <EmptyState message="Nenhuma pessoa encontrada" />
         ) : (
-          <div className="grid gap-3">
+          <div className="space-y-2">
             {filtered.map((m) => (
-              <Card key={m.id} className="shadow-card-soft hover:shadow-elevated transition-shadow">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 text-primary font-serif text-lg flex items-center justify-center">
-                    {m.nome_completo
-                      .split(" ")
-                      .slice(0, 2)
-                      .map((n) => n[0])
-                      .join("")}
+              <div
+                key={m.id}
+                className="bg-card rounded-xl border border-border shadow-[var(--shadow-card)] overflow-hidden"
+              >
+                {/* ── Linha principal ── */}
+                <div className="flex items-center gap-3 px-3 py-3">
+                  {/* Avatar */}
+                  <div className="w-11 h-11 rounded-full bg-primary/10 text-primary font-serif text-base flex items-center justify-center shrink-0 select-none">
+                    {initials(m.nome_completo)}
                   </div>
+
+                  {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium truncate">{m.nome_completo}</span>
-                      <Badge variant="outline" className={tipoPessoaColor[m.tipo_pessoa]}>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-[15px] truncate">{m.nome_completo}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 ${tipoPessoaColor[m.tipo_pessoa]}`}>
                         {tipoPessoaLabel[m.tipo_pessoa]}
                       </Badge>
                       {m.tipo_pessoa === "membro" && (
-                        <Badge variant="outline" className={statusColor[m.status]}>
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 ${statusColor[m.status]}`}>
                           {m.status}
                         </Badge>
                       )}
-                    </div>
-                    <div className="text-sm text-muted-foreground truncate">
-                      {[m.telefone_celular, m.email, m.bairro].filter(Boolean).join(" • ") || "—"}
+                      {m.bairro && (
+                        <span className="text-[11px] text-muted-foreground truncate">{m.bairro}</span>
+                      )}
                     </div>
                   </div>
+
+                  {/* Editar (desktop / mobile minimizado) */}
                   {canEdit && (
-                    <div className="flex gap-0.5 shrink-0">
-                      {m.tipo_pessoa === "visitante" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9"
-                          title="Acompanhar visitante"
-                          onClick={() => setVisitantePessoa(m)}
-                        >
-                          <Sparkles className="w-4 h-4 text-warning" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9"
-                        title="Vínculos familiares"
-                        onClick={() => setVinculosPessoa(m)}
-                      >
-                        <Link2 className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9"
-                        title="Atuações voluntárias"
-                        onClick={() => setAtuacoesPessoa(m)}
-                      >
-                        <Briefcase className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9"
-                        onClick={() => {
-                          setEditing(m);
-                          setOpen(true);
-                        }}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
+                    <button
+                      onClick={() => { setEditing(m); setOpen(true); }}
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-transform shrink-0"
+                      title="Editar"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* ── Ações rápidas mobile ── */}
+                <div className="flex border-t border-border/60 divide-x divide-border/60">
+                  {/* Ligar */}
+                  {m.telefone_celular ? (
+                    <a
+                      href={`tel:${m.telefone_celular.replace(/\D/g, "")}`}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 active:bg-muted transition-colors"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>Ligar</span>
+                    </a>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] text-muted-foreground/40 cursor-not-allowed">
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>Ligar</span>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+
+                  {/* WhatsApp */}
+                  {m.telefone_celular ? (
+                    <a
+                      href={`https://wa.me/55${m.telefone_celular.replace(/\D/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 active:bg-muted transition-colors"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </a>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] text-muted-foreground/40 cursor-not-allowed">
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </div>
+                  )}
+
+                  {/* Ações adicionais (visitante, vínculos, atuações) */}
+                  {canEdit && (
+                    <div className="flex divide-x divide-border/60">
+                      {m.tipo_pessoa === "visitante" && (
+                        <button
+                          onClick={() => setVisitantePessoa(m)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-[12px] text-warning hover:bg-muted/40 active:bg-muted transition-colors"
+                          title="Acompanhar visitante"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setVinculosPessoa(m)}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 active:bg-muted transition-colors"
+                        title="Vínculos familiares"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setAtuacoesPessoa(m)}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 active:bg-muted transition-colors"
+                        title="Atuações voluntárias"
+                      >
+                        <Briefcase className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -292,16 +358,12 @@ export default function Membros() {
       <MembroForm open={open} onOpenChange={setOpen} membro={editing} onSaved={load} />
       <VinculosPessoaDialog
         open={!!vinculosPessoa}
-        onOpenChange={(v) => {
-          if (!v) setVinculosPessoa(null);
-        }}
+        onOpenChange={(v) => { if (!v) setVinculosPessoa(null); }}
         pessoa={vinculosPessoa}
       />
       <AtuacoesDialog
         open={!!atuacoesPessoa}
-        onOpenChange={(v) => {
-          if (!v) setAtuacoesPessoa(null);
-        }}
+        onOpenChange={(v) => { if (!v) setAtuacoesPessoa(null); }}
         pessoa={atuacoesPessoa}
       />
       <VisitanteDialog
