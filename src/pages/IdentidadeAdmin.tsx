@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,12 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
   Church, Save, Loader2, Plus, Trash2, Heart, Info,
-  Globe, Building2, Link,
+  Globe, Building2, Link, ExternalLink, AlertTriangle, CheckCircle2, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -55,6 +56,8 @@ interface Instituicao {
   sigla: string | null;
   site_oficial: string | null;
   oficial: boolean;
+  tipo_instituicao: string;
+  permite_integracao: boolean;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -70,8 +73,28 @@ const PLATAFORMAS = [
   { value: "outro",      label: "Outro",      icon: "🔗" },
 ];
 
+const TIPOS_INSTITUICAO: Record<string, string> = {
+  denominacao:  "Denominação",
+  missoes:      "Missões",
+  organizacao:  "Organização",
+  outro:        "Outro",
+};
+
 const plataformaLabel = (v: string) =>
   PLATAFORMAS.find((p) => p.value === v) ?? { label: v, icon: "🔗" };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Normaliza URL: lowercase, sem espaços, sem barra final */
+function normalizarSite(url: string): string {
+  return url.trim().toLowerCase().replace(/\/+$/, "");
+}
+
+/** Valida se URL começa com http:// ou https:// */
+function validarUrl(url: string): boolean {
+  if (!url) return true; // opcional
+  return /^https?:\/\/.+\..+/.test(url.trim());
+}
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
@@ -104,8 +127,16 @@ export default function IdentidadeAdmin() {
   // Instituições disponíveis + vinculadas
   const [todasInstituicoes, setTodasInstituicoes] = useState<Instituicao[]>([]);
   const [vinculadas, setVinculadas] = useState<Set<string>>(new Set());
-  const [novaInst, setNovaInst] = useState({ nome: "", sigla: "" });
+
+  // Nova instituição personalizada
   const [adicionandoInst, setAdicionandoInst] = useState(false);
+  const [novaInst, setNovaInst] = useState({
+    nome: "", sigla: "", site_oficial: "", tipo_instituicao: "outro",
+  });
+  const [erroSiteInst, setErroSiteInst] = useState("");
+  const [sugestoes, setSugestoes] = useState<Instituicao[]>([]);
+  const [buscandoSugestoes, setBuscandoSugestoes] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Guarda de acesso ──
   useEffect(() => {
@@ -118,7 +149,12 @@ export default function IdentidadeAdmin() {
 
     const [{ data: id }, { data: insts }] = await Promise.all([
       supabase.from("identidade_igreja").select("*").eq("ativa", true).maybeSingle(),
-      supabase.from("instituicoes").select("*").eq("ativo", true).order("oficial", { ascending: false }).order("nome"),
+      supabase
+        .from("instituicoes")
+        .select("*")
+        .eq("ativo", true)
+        .order("oficial", { ascending: false })
+        .order("nome"),
     ]);
 
     setTodasInstituicoes((insts ?? []) as Instituicao[]);
@@ -142,7 +178,6 @@ export default function IdentidadeAdmin() {
           : []
       );
 
-      // Valores
       const { data: vals } = await supabase
         .from("identidade_valores")
         .select("*")
@@ -155,7 +190,6 @@ export default function IdentidadeAdmin() {
         }))
       );
 
-      // Vínculos institucionais
       const { data: vins } = await supabase
         .from("igreja_instituicoes")
         .select("instituicao_id")
@@ -198,19 +232,82 @@ export default function IdentidadeAdmin() {
       return next;
     });
 
+  /** Busca sugestões de similaridade ao digitar no formulário de nova inst */
+  const buscarSugestoes = (nome: string, site: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!nome.trim() && !site.trim()) { setSugestoes([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setBuscandoSugestoes(true);
+      const { data } = await supabase.rpc("buscar_instituicao_similar", {
+        p_nome: nome.trim() || null,
+        p_site: site.trim() ? normalizarSite(site) : null,
+      });
+      setSugestoes((data ?? []) as Instituicao[]);
+      setBuscandoSugestoes(false);
+    }, 450);
+  };
+
+  const handleNovaInstNome = (v: string) => {
+    setNovaInst((p) => ({ ...p, nome: v }));
+    buscarSugestoes(v, novaInst.site_oficial);
+  };
+
+  const handleNovaInstSite = (v: string) => {
+    setNovaInst((p) => ({ ...p, site_oficial: v }));
+    setErroSiteInst("");
+    buscarSugestoes(novaInst.nome, v);
+  };
+
+  const selecionarSugestao = (inst: Instituicao) => {
+    setVinculadas((prev) => new Set([...prev, inst.id]));
+    setAdicionandoInst(false);
+    setNovaInst({ nome: "", sigla: "", site_oficial: "", tipo_instituicao: "outro" });
+    setSugestoes([]);
+    toast.success(`"${inst.nome}" vinculada à igreja.`);
+  };
+
   const criarInstPersonalizada = async () => {
-    if (!novaInst.nome.trim()) return;
+    if (!novaInst.nome.trim()) { toast.error("Nome é obrigatório"); return; }
+
+    // Validar site se informado
+    if (novaInst.site_oficial.trim() && !validarUrl(novaInst.site_oficial)) {
+      setErroSiteInst("Informe um site válido. Exemplo: https://exemplo.com");
+      return;
+    }
+
+    const siteNorm = novaInst.site_oficial.trim()
+      ? normalizarSite(novaInst.site_oficial)
+      : null;
+
     const { data, error } = await supabase
       .from("instituicoes")
-      .insert({ nome: novaInst.nome.trim(), sigla: novaInst.sigla.trim() || null, oficial: false, ativo: true })
+      .insert({
+        nome:               novaInst.nome.trim(),
+        sigla:              novaInst.sigla.trim() || null,
+        site_oficial:       siteNorm,
+        tipo_instituicao:   novaInst.tipo_instituicao,
+        permite_integracao: false,
+        oficial:            false,
+        ativo:              true,
+      })
       .select("id")
       .single();
-    if (error) { toast.error(error.message); return; }
+
+    if (error) {
+      if (error.code === "23505") {
+        toast.error("Já existe uma instituição com esse site cadastrado.");
+      } else {
+        toast.error(error.message);
+      }
+      return;
+    }
+
     await load();
     setVinculadas((prev) => new Set([...prev, (data as any).id]));
-    setNovaInst({ nome: "", sigla: "" });
+    setNovaInst({ nome: "", sigla: "", site_oficial: "", tipo_instituicao: "outro" });
+    setSugestoes([]);
     setAdicionandoInst(false);
-    toast.success("Instituição adicionada");
+    toast.success("Instituição adicionada e vinculada.");
   };
 
   // ── Salvar tudo ──
@@ -259,18 +356,14 @@ export default function IdentidadeAdmin() {
       .from("igreja_instituicoes").select("instituicao_id").eq("igreja_id", igrejId);
     const atuaisSet = new Set((atuais ?? []).map((a: any) => a.instituicao_id));
 
-    // Inserir novos
     for (const id of vinculadas) {
-      if (!atuaisSet.has(id)) {
+      if (!atuaisSet.has(id))
         await supabase.from("igreja_instituicoes").insert({ igreja_id: igrejId, instituicao_id: id });
-      }
     }
-    // Remover desmarcados
     for (const id of atuaisSet) {
-      if (!vinculadas.has(id)) {
+      if (!vinculadas.has(id))
         await supabase.from("igreja_instituicoes")
           .delete().eq("igreja_id", igrejId).eq("instituicao_id", id);
-      }
     }
 
     setSaving(false);
@@ -286,6 +379,10 @@ export default function IdentidadeAdmin() {
       </div>
     );
   }
+
+  const instOficiais     = todasInstituicoes.filter((i) => i.oficial);
+  const instPersonaliz   = todasInstituicoes.filter((i) => !i.oficial);
+  const isAdmin          = hasRole(["admin"]);
 
   return (
     <div>
@@ -313,7 +410,7 @@ export default function IdentidadeAdmin() {
             <div>
               <Label>Nome da Igreja *</Label>
               <Input value={form.nome_igreja} onChange={(e) => setForm({ ...form, nome_igreja: e.target.value })}
-                placeholder="Ex: QIBRJ — Quadrangular Ibirapuera" />
+                placeholder="Ex: Quarta Igreja Batista do Rio de Janeiro" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -432,90 +529,217 @@ export default function IdentidadeAdmin() {
               <Info className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Marque as convenções, juntas e entidades às quais a igreja é filiada.
-                Esses vínculos serão exibidos em relatórios e utilizados na integração
-                com agendas e missões.
+                Instituições com <Zap className="inline w-3 h-3 text-amber-500" /> permitem integração futura com agenda.
               </p>
             </div>
 
             {/* Instituições oficiais */}
-            <div className="space-y-2">
-              {todasInstituicoes.filter((i) => i.oficial).map((inst) => (
-                <label
-                  key={inst.id}
-                  className="flex items-start gap-3 rounded-md border px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors"
-                >
-                  <Checkbox
-                    checked={vinculadas.has(inst.id)}
-                    onCheckedChange={() => toggleInst(inst.id)}
-                    className="mt-0.5"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium leading-tight">{inst.nome}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {inst.sigla && (
-                        <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{inst.sigla}</span>
-                      )}
-                      {inst.site_oficial && (
-                        <a href={inst.site_oficial} target="_blank" rel="noopener noreferrer"
-                          className="text-[11px] text-primary hover:underline truncate"
-                          onClick={(e) => e.stopPropagation()}>
-                          {inst.site_oficial.replace("https://", "")}
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-
-            {/* Instituições personalizadas */}
-            {todasInstituicoes.filter((i) => !i.oficial).length > 0 && (
+            {instOficiais.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Personalizadas</p>
-                {todasInstituicoes.filter((i) => !i.oficial).map((inst) => (
-                  <label key={inst.id}
-                    className="flex items-center gap-3 rounded-md border px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Oficiais</p>
+                {instOficiais.map((inst) => (
+                  <label
+                    key={inst.id}
+                    className="flex items-start gap-3 rounded-md border px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors"
+                  >
                     <Checkbox
                       checked={vinculadas.has(inst.id)}
                       onCheckedChange={() => toggleInst(inst.id)}
+                      className="mt-0.5"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">{inst.nome}</p>
-                      {inst.sigla && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{inst.sigla}</span>}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium leading-tight">{inst.nome}</p>
+                        {inst.sigla && (
+                          <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{inst.sigla}</span>
+                        )}
+                        {inst.permite_integracao && (
+                          <span title="Permite integração com agenda">
+                            <Zap className="w-3 h-3 text-amber-500" />
+                          </span>
+                        )}
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
+                          {TIPOS_INSTITUICAO[inst.tipo_instituicao] ?? inst.tipo_instituicao}
+                        </Badge>
+                      </div>
+                      {inst.site_oficial && (
+                        <a
+                          href={inst.site_oficial}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-0.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          Visitar site
+                        </a>
+                      )}
                     </div>
                   </label>
                 ))}
               </div>
             )}
 
-            {/* Adicionar instituição personalizada */}
-            {adicionandoInst ? (
-              <div className="rounded-md border p-3 space-y-2 bg-muted/30">
-                <p className="text-xs font-medium text-muted-foreground">Nova instituição personalizada</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-2">
-                    <Input value={novaInst.nome}
-                      onChange={(e) => setNovaInst({ ...novaInst, nome: e.target.value })}
-                      placeholder="Nome da instituição" />
-                  </div>
-                  <Input value={novaInst.sigla}
-                    onChange={(e) => setNovaInst({ ...novaInst, sigla: e.target.value })}
-                    placeholder="Sigla" />
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={criarInstPersonalizada} disabled={!novaInst.nome.trim()}>
-                    Adicionar
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => { setAdicionandoInst(false); setNovaInst({ nome: "", sigla: "" }); }}>
-                    Cancelar
-                  </Button>
-                </div>
+            {/* Instituições personalizadas */}
+            {instPersonaliz.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Personalizadas</p>
+                {instPersonaliz.map((inst) => (
+                  <label
+                    key={inst.id}
+                    className="flex items-start gap-3 rounded-md border px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors"
+                  >
+                    <Checkbox
+                      checked={vinculadas.has(inst.id)}
+                      onCheckedChange={() => toggleInst(inst.id)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium leading-tight">{inst.nome}</p>
+                        {inst.sigla && (
+                          <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{inst.sigla}</span>
+                        )}
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
+                          {TIPOS_INSTITUICAO[inst.tipo_instituicao] ?? inst.tipo_instituicao}
+                        </Badge>
+                      </div>
+                      {inst.site_oficial && (
+                        <a
+                          href={inst.site_oficial}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-0.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          Visitar site
+                        </a>
+                      )}
+                    </div>
+                  </label>
+                ))}
               </div>
-            ) : (
-              <Button type="button" variant="outline" className="w-full border-dashed gap-2"
-                onClick={() => setAdicionandoInst(true)}>
-                <Plus className="w-4 h-4" /> Adicionar instituição personalizada
-              </Button>
+            )}
+
+            {/* Formulário de nova instituição personalizada — apenas admin */}
+            {isAdmin && (
+              adicionandoInst ? (
+                <div className="rounded-md border p-4 space-y-3 bg-muted/20">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Nova instituição personalizada
+                  </p>
+
+                  {/* Sugestões de duplicidade */}
+                  {sugestoes.length > 0 && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Encontramos instituições similares — selecione uma existente:
+                      </div>
+                      {sugestoes.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => selecionarSugestao(s)}
+                          className="w-full flex items-center gap-2 text-left rounded-md border bg-background px-3 py-2 hover:bg-muted/60 transition-colors"
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{s.nome}</p>
+                            {s.site_oficial && (
+                              <p className="text-[11px] text-muted-foreground truncate">{s.site_oficial}</p>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                      <p className="text-[11px] text-muted-foreground">
+                        Ou continue abaixo para criar uma nova mesmo assim.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Campo: Nome */}
+                  <div>
+                    <Label className="text-xs">Nome da instituição *</Label>
+                    <Input
+                      value={novaInst.nome}
+                      onChange={(e) => handleNovaInstNome(e.target.value)}
+                      placeholder="Ex: Convenção Batista Brasileira"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* Sigla + Tipo */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Sigla</Label>
+                      <Input
+                        value={novaInst.sigla}
+                        onChange={(e) => setNovaInst((p) => ({ ...p, sigla: e.target.value }))}
+                        placeholder="Ex: CBB"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Tipo</Label>
+                      <Select
+                        value={novaInst.tipo_instituicao}
+                        onValueChange={(v) => setNovaInst((p) => ({ ...p, tipo_instituicao: v }))}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(TIPOS_INSTITUICAO).map(([val, lbl]) => (
+                            <SelectItem key={val} value={val}>{lbl}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Site oficial */}
+                  <div>
+                    <Label className="text-xs">Site oficial (recomendado)</Label>
+                    <Input
+                      value={novaInst.site_oficial}
+                      onChange={(e) => handleNovaInstSite(e.target.value)}
+                      placeholder="https://convencaobatista.com.br"
+                      className={`mt-1 ${erroSiteInst ? "border-destructive" : ""}`}
+                    />
+                    {erroSiteInst && (
+                      <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> {erroSiteInst}
+                      </p>
+                    )}
+                    {buscandoSugestoes && (
+                      <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Verificando duplicidade…
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" onClick={criarInstPersonalizada} disabled={!novaInst.nome.trim()}>
+                      Adicionar
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setAdicionandoInst(false);
+                      setNovaInst({ nome: "", sigla: "", site_oficial: "", tipo_instituicao: "outro" });
+                      setSugestoes([]);
+                      setErroSiteInst("");
+                    }}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button type="button" variant="outline" className="w-full border-dashed gap-2"
+                  onClick={() => setAdicionandoInst(true)}>
+                  <Plus className="w-4 h-4" /> Adicionar instituição personalizada
+                </Button>
+              )
             )}
           </CardContent>
         </Card>
