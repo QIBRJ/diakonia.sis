@@ -25,7 +25,6 @@ import { BrandMark } from "@/components/Brand";
 import { useEffect } from "react";
 import { QuickActionsFab } from "@/components/QuickActionsFab";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenuButton } from "@/components/layout/UserMenuButton";
 
 const desktopNav = [
@@ -226,10 +225,6 @@ export default function AppLayout() {
             <span className="font-medium">{roleLabel[principalRole]}</span>
           </div>
           <div className="text-xs text-sidebar-foreground/60 truncate">{user.email}</div>
-          <ThemeToggle
-            variant="outline"
-            className="w-full bg-transparent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent justify-center"
-          />
           <Button
             variant="outline"
             size="sm"
@@ -268,10 +263,8 @@ export default function AppLayout() {
           {/* Espaço flexível quando na home */}
           {isHome && <span className="flex-1" />}
 
-          {/* Botões topo direito */}
+          {/* Menu do usuário — avatar + dropdown */}
           <div className="flex items-center gap-1 shrink-0">
-            <ThemeToggle className="text-sidebar-foreground hover:bg-sidebar-accent" />
-            {/* Menu do usuário — avatar + dropdown */}
             <UserMenuButton />
           </div>
         </header>

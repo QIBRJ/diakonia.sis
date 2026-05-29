@@ -3,151 +3,144 @@
 @tailwind utilities;
 
 /*
- * DIAKONIA APP — Design System
- * Estrutura: :root = tema escuro (padrão), .light = tema claro
- * Regra: APENAS variáveis CSS e overrides mínimos seguros.
- * Não sobrescrever classes shadcn/ui com seletores de elemento.
+ * DIAKONIA APP — Tema da Igreja
+ * Paleta: Allure (#2F4A6D) · Algodão Egípcio (#F5F3F0) · Rosa Queimado (#B06A73)
+ * Tema único — sem alternância claro/escuro.
+ * Conversões HSL: #2F4A6D→214 40% 31% | #F5F3F0→36 20% 95% | #B06A73→352 31% 55%
  */
 
 @layer base {
 
   /* ════════════════════════════════════════════════════════════
-     TEMA ESCURO — padrão (sem classe no <html>)
-     Fundo: #0F172A | Cards: #1E293B | Texto: #F1F5F9 | Sec: #94A3B8
+     TEMA ÚNICO — identidade da igreja
+     Aplicado sempre, independente de preferência do sistema.
      ════════════════════════════════════════════════════════════ */
   :root {
-    /* Superfícies */
-    --background:         222 47% 11%;   /* #0F172A — slate‑900          */
-    --foreground:         210 40% 98%;   /* #F1F5F9 — slate‑100          */
-    --card:               217 33% 17%;   /* #1E293B — slate‑800          */
-    --card-foreground:    210 40% 98%;
-    --popover:            217 33% 17%;   /* dropdowns no escuro          */
-    --popover-foreground: 210 40% 98%;
 
-    /* Marca — dourado Diakonia */
-    --primary:            42 68% 60%;
-    --primary-foreground: 222 47% 11%;
-    --primary-glow:       42 78% 68%;
+    /* ── Superfícies ──────────────────────────────────────────── */
+    --background:         36 20% 95%;    /* #F5F3F0 — Algodão Egípcio   */
+    --foreground:         0 0% 16%;      /* #2A2A2A — cinza escuro       */
 
-    /* Secundárias */
-    --secondary:          217 28% 22%;
-    --secondary-foreground: 210 35% 92%;
-    --muted:              217 28% 20%;
-    --muted-foreground:   215 20% 65%;   /* #94A3B8 — slate‑400          */
-    --accent:             42 68% 60%;
-    --accent-foreground:  222 47% 11%;
+    --card:               36 15% 98%;    /* off-white quente para cards  */
+    --card-foreground:    0 0% 16%;
 
-    /* Personalizada */
-    --gold:               42 68% 60%;
-    --gold-foreground:    222 47% 11%;
-    --teal:               188 52% 42%;
+    --popover:            0 0% 100%;     /* branco puro em dropdowns     */
+    --popover-foreground: 0 0% 16%;
+
+    /* ── Primário: Allure (azul) ──────────────────────────────── */
+    --primary:            214 40% 31%;   /* #2F4A6D                      */
+    --primary-foreground: 36 20% 95%;   /* texto Algodão nos botões     */
+    --primary-glow:       214 45% 42%;  /* hover / glow                 */
+
+    /* ── Secundário: variante mais clara do azul ─────────────── */
+    --secondary:          214 25% 88%;
+    --secondary-foreground: 214 40% 25%;
+
+    /* ── Muted / neutros ─────────────────────────────────────── */
+    --muted:              36 15% 91%;    /* fundo neutro leve            */
+    --muted-foreground:   0 0% 36%;      /* #5C5C5C — cinza médio        */
+
+    /* ── Accent: Rosa Queimado ────────────────────────────────── */
+    --accent:             352 31% 55%;   /* #B06A73                      */
+    --accent-foreground:  0 0% 100%;
+
+    /* ── Gold → Rosa Queimado (substitui o dourado no código) ─── */
+    --gold:               352 31% 55%;   /* #B06A73 — accent principal   */
+    --gold-foreground:    0 0% 100%;
+
+    /* ── Teal → complementar azul-esverdeado ─────────────────── */
+    --teal:               188 45% 38%;
     --teal-foreground:    0 0% 100%;
 
-    /* Feedback */
-    --success:            142 70% 42%;
+    /* ── Feedback ────────────────────────────────────────────── */
+    --success:            142 55% 36%;
     --success-foreground: 0 0% 100%;
-    --warning:            38 90% 55%;
-    --warning-foreground: 222 47% 11%;
-    --destructive:        0 70% 55%;
+
+    --warning:            38 88% 48%;
+    --warning-foreground: 0 0% 16%;
+
+    --destructive:        0 68% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Estrutura */
-    --border:             217 25% 24%;
-    --input:              217 28% 20%;
-    --ring:               42 68% 60%;
-    --radius:             0.625rem;
+    /* ── Estrutura ───────────────────────────────────────────── */
+    --border:             36 18% 85%;    /* borda quente discreta        */
+    --input:              36 15% 93%;    /* fundo dos inputs             */
+    --ring:               214 40% 31%;   /* foco igual ao primary        */
 
-    /* Gradientes */
-    --gradient-hero:  linear-gradient(140deg, hsl(222 47% 9%) 0%, hsl(217 33% 14%) 60%, hsl(42 30% 20%) 100%);
-    --gradient-gold:  linear-gradient(135deg, hsl(42 75% 65%), hsl(36 60% 46%));
-    --gradient-verse: linear-gradient(135deg, hsl(217 33% 15%), hsl(217 28% 20%));
+    --radius: 0.625rem;
 
-    /* Sombras */
-    --shadow-card:     0 1px 3px hsl(0 0% 0% / 0.40), 0 1px 2px hsl(0 0% 0% / 0.50);
-    --shadow-elevated: 0 16px 40px -12px hsl(0 0% 0% / 0.60);
-    --shadow-gold:     0 8px 24px -8px hsl(42 68% 60% / 0.35);
+    /* ── Gradientes ──────────────────────────────────────────── */
+    --gradient-hero:  linear-gradient(140deg, hsl(36 20% 97%) 0%, hsl(36 20% 93%) 60%, hsl(214 20% 85%) 100%);
+    --gradient-gold:  linear-gradient(135deg, hsl(352 35% 60%), hsl(352 28% 48%));
+    --gradient-verse: linear-gradient(135deg, hsl(36 20% 95%), hsl(36 15% 91%));
 
-    /* Sidebar — mais escura que o fundo */
-    --sidebar-background:        222 47% 9%;
-    --sidebar-foreground:        210 35% 92%;
-    --sidebar-primary:           42 68% 60%;
-    --sidebar-primary-foreground:222 47% 11%;
-    --sidebar-accent:            217 33% 16%;
-    --sidebar-accent-foreground: 210 40% 97%;
-    --sidebar-border:            217 25% 20%;
-    --sidebar-ring:              42 68% 60%;
+    /* ── Sombras (suaves no tema claro) ──────────────────────── */
+    --shadow-card:     0 1px 3px hsl(214 30% 20% / 0.08), 0 1px 2px hsl(214 30% 20% / 0.05);
+    --shadow-elevated: 0 16px 40px -12px hsl(214 30% 20% / 0.16);
+    --shadow-gold:     0 8px 24px -8px hsl(352 31% 55% / 0.28);
+
+    /* ── Sidebar: Allure azul ─────────────────────────────────── */
+    --sidebar-background:        214 40% 31%;   /* #2F4A6D                */
+    --sidebar-foreground:        36 20% 92%;    /* Algodão Egípcio claro  */
+    --sidebar-primary:           352 31% 62%;   /* Rosa queimado + claro  */
+    --sidebar-primary-foreground:0 0% 100%;
+    --sidebar-accent:            214 35% 38%;   /* hover: azul mais claro */
+    --sidebar-accent-foreground: 36 20% 97%;
+    --sidebar-border:            214 32% 26%;   /* borda mais escura      */
+    --sidebar-ring:              352 31% 62%;
   }
 
   /* ════════════════════════════════════════════════════════════
-     TEMA CLARO — ativado pela classe .light no <html>
-     Fundo: #F7F9FB | Texto: #1A202C | Secundário: #4A5568
-     Dropdowns/Cards: branco puro
+     .light — mesmas variáveis (tema único, toggle sem efeito)
      ════════════════════════════════════════════════════════════ */
   .light {
-    /* Superfícies */
-    --background:         210 17% 97%;   /* #F7F9FB — azul‑cinza suave  */
-    --foreground:         220 26% 14%;   /* #1A202C — quase preto        */
-    --card:               0 0% 100%;     /* branco puro para cards       */
-    --card-foreground:    220 26% 14%;
-    --popover:            0 0% 100%;     /* dropdowns brancos no claro   */
-    --popover-foreground: 220 26% 14%;
-
-    /* Marca — dourado mais escuro (contraste ok no claro) */
-    --primary:            42 62% 46%;
-    --primary-foreground: 0 0% 100%;
-    --primary-glow:       42 70% 54%;
-
-    /* Secundárias */
-    --secondary:          210 14% 93%;
-    --secondary-foreground: 220 20% 25%;
-    --muted:              210 14% 91%;
-    --muted-foreground:   220 16% 36%;   /* #4A5568 — cinza‑azul médio  */
-    --accent:             42 62% 46%;
+    --background:         36 20% 95%;
+    --foreground:         0 0% 16%;
+    --card:               36 15% 98%;
+    --card-foreground:    0 0% 16%;
+    --popover:            0 0% 100%;
+    --popover-foreground: 0 0% 16%;
+    --primary:            214 40% 31%;
+    --primary-foreground: 36 20% 95%;
+    --primary-glow:       214 45% 42%;
+    --secondary:          214 25% 88%;
+    --secondary-foreground: 214 40% 25%;
+    --muted:              36 15% 91%;
+    --muted-foreground:   0 0% 36%;
+    --accent:             352 31% 55%;
     --accent-foreground:  0 0% 100%;
-
-    /* Personalizada */
-    --gold:               42 62% 46%;
+    --gold:               352 31% 55%;
     --gold-foreground:    0 0% 100%;
-    --teal:               188 52% 36%;
+    --teal:               188 45% 38%;
     --teal-foreground:    0 0% 100%;
-
-    /* Feedback */
-    --success:            142 58% 36%;
+    --success:            142 55% 36%;
     --success-foreground: 0 0% 100%;
     --warning:            38 88% 48%;
-    --warning-foreground: 220 26% 14%;
-    --destructive:        0 70% 48%;
+    --warning-foreground: 0 0% 16%;
+    --destructive:        0 68% 50%;
     --destructive-foreground: 0 0% 100%;
-
-    /* Estrutura */
-    --border:             210 18% 88%;
-    --input:              210 18% 92%;
-    --ring:               42 62% 46%;
-
-    /* Gradientes */
-    --gradient-hero:  linear-gradient(140deg, hsl(210 17% 98%) 0%, hsl(210 14% 94%) 60%, hsl(42 30% 88%) 100%);
-    --gradient-gold:  linear-gradient(135deg, hsl(42 68% 50%), hsl(36 62% 40%));
-    --gradient-verse: linear-gradient(135deg, hsl(210 17% 97%), hsl(210 14% 91%));
-
-    /* Sombras (bem suaves no claro) */
-    --shadow-card:     0 1px 3px hsl(220 26% 14% / 0.07), 0 1px 2px hsl(220 26% 14% / 0.05);
-    --shadow-elevated: 0 16px 40px -12px hsl(220 26% 14% / 0.14);
-    --shadow-gold:     0 8px 24px -8px hsl(42 62% 46% / 0.22);
-
-    /* Sidebar — mantida escura no claro (contraste com conteúdo claro) */
-    --sidebar-background:        220 26% 14%;  /* #1A202C                */
-    --sidebar-foreground:        210 17% 95%;
-    --sidebar-primary:           42 65% 58%;
-    --sidebar-primary-foreground:220 26% 10%;
-    --sidebar-accent:            220 20% 20%;
-    --sidebar-accent-foreground: 210 17% 97%;
-    --sidebar-border:            220 18% 22%;
-    --sidebar-ring:              42 65% 58%;
+    --border:             36 18% 85%;
+    --input:              36 15% 93%;
+    --ring:               214 40% 31%;
+    --gradient-hero:  linear-gradient(140deg, hsl(36 20% 97%) 0%, hsl(36 20% 93%) 60%, hsl(214 20% 85%) 100%);
+    --gradient-gold:  linear-gradient(135deg, hsl(352 35% 60%), hsl(352 28% 48%));
+    --gradient-verse: linear-gradient(135deg, hsl(36 20% 95%), hsl(36 15% 91%));
+    --shadow-card:     0 1px 3px hsl(214 30% 20% / 0.08), 0 1px 2px hsl(214 30% 20% / 0.05);
+    --shadow-elevated: 0 16px 40px -12px hsl(214 30% 20% / 0.16);
+    --shadow-gold:     0 8px 24px -8px hsl(352 31% 55% / 0.28);
+    --sidebar-background:        214 40% 31%;
+    --sidebar-foreground:        36 20% 92%;
+    --sidebar-primary:           352 31% 62%;
+    --sidebar-primary-foreground:0 0% 100%;
+    --sidebar-accent:            214 35% 38%;
+    --sidebar-accent-foreground: 36 20% 97%;
+    --sidebar-border:            214 32% 26%;
+    --sidebar-ring:              352 31% 62%;
   }
 }
 
 /* ════════════════════════════════════════════════════════════
-   BASE — somente overrides seguros que NÃO conflitam com shadcn
+   BASE GLOBAL — overrides seguros
    ════════════════════════════════════════════════════════════ */
 @layer base {
   * {
@@ -158,11 +151,12 @@
   html {
     overflow-x: hidden;
     scroll-behavior: smooth;
+    /* Força o tema da igreja independente da preferência do sistema */
+    color-scheme: light;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
-    /* Inter é carregado via <head> no index.html */
     font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
     font-size: 15px;
     line-height: 1.6;
@@ -174,21 +168,19 @@
   }
 
   /* Hierarquia tipográfica */
-  h1, h2, h3, h4 {
-    @apply font-serif tracking-tight;
-  }
+  h1, h2, h3, h4 { @apply font-serif tracking-tight; }
 
-  /* Seleção de texto com cor da marca */
+  /* Seleção com a cor da marca */
   ::selection {
-    background-color: hsl(var(--gold) / 0.22);
-    color: hsl(var(--foreground));
+    background-color: hsl(352 31% 55% / 0.20);
+    color: hsl(0 0% 16%);
   }
 
   /* Safe areas iOS */
   .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pt-safe { padding-top:    env(safe-area-inset-top);    }
 
-  /* Tamanho mínimo em mobile (evita zoom automático) */
+  /* Font size mínimo mobile (evita zoom) */
   input, select, textarea, button { font-size: 16px; }
   @media (min-width: 768px) {
     input, select, textarea, button { font-size: inherit; }
@@ -196,17 +188,22 @@
 }
 
 /* ════════════════════════════════════════════════════════════
-   COMPONENTES — animações e utilitários visuais
+   UTILITÁRIOS — apenas o essencial
    ════════════════════════════════════════════════════════════ */
 @layer utilities {
 
-  /* Scrollbar fina e discreta */
-  ::-webkit-scrollbar          { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track    { background: transparent; }
-  ::-webkit-scrollbar-thumb    { background: hsl(var(--border)); border-radius: 99px; }
-  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.45); }
+  /* Scrollbar discreta na paleta da igreja */
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(214 25% 70%);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(214 40% 55%);
+  }
 
-  /* Gradiente dourado no texto */
+  /* Texto com gradiente Rosa Queimado */
   .text-gradient-gold {
     background: var(--gradient-gold);
     -webkit-background-clip: text;
@@ -214,22 +211,22 @@
     background-clip: text;
   }
 
-  /* Separador com fade */
+  /* Separador */
   .divider-gold {
     height: 1px;
-    background: linear-gradient(to right, transparent, hsl(var(--gold) / 0.38), transparent);
+    background: linear-gradient(to right, transparent, hsl(352 31% 55% / 0.35), transparent);
     border: none;
     margin: 1rem 0;
   }
 
-  /* Superfície vidro (cards flutuantes) */
+  /* Superfície glass */
   .surface-glass {
-    background: hsl(var(--card) / 0.88);
+    background: hsl(36 15% 98% / 0.90);
     backdrop-filter: blur(8px);
-    border: 1px solid hsl(var(--border) / 0.55);
+    border: 1px solid hsl(36 18% 85% / 0.60);
   }
 
-  /* Animações de entrada (mantidas iguais ao que já funciona) */
+  /* Animações */
   @keyframes fade-in {
     from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0);   }
@@ -247,8 +244,8 @@
     to   { height: 0; }
   }
 
-  .animate-fade-in  { animation: fade-in 0.22s ease-out both; }
-  .animate-scale-in { animation: scale-in 0.18s ease-out both; }
+  .animate-fade-in        { animation: fade-in 0.22s ease-out both; }
+  .animate-scale-in       { animation: scale-in 0.18s ease-out both; }
   .animate-accordion-down { animation: accordion-down 0.2s ease-out; }
   .animate-accordion-up   { animation: accordion-up 0.2s ease-out;   }
 }
