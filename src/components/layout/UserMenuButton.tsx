@@ -23,6 +23,7 @@ import {
   FileText,
   Upload,
   Download,
+  Flame,
 } from "lucide-react";
 
 /**
@@ -200,6 +201,13 @@ export function UserMenuButton() {
             >
               <Download className="w-4 h-4 text-muted-foreground" />
               <span>Exportação de Dados</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2 cursor-pointer py-2.5"
+              onClick={() => navigate("/admin/campanhas")}
+            >
+              <Flame className="w-4 h-4 text-muted-foreground" />
+              <span>Campanhas Espirituais</span>
             </DropdownMenuItem>
           </>
         )}

@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/select";
 import {
   Church, Save, Loader2, Plus, Trash2, Heart, Info,
-  Globe, Building2, Link, ExternalLink, AlertTriangle, CheckCircle2, Zap,
+  Globe, Building2, Link, ExternalLink, AlertTriangle,
+  CheckCircle2, Zap, Sparkles, User,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,6 +33,8 @@ interface Identidade {
   slug: string | null;
   site_oficial: string | null;
   redes_sociais: RedeSocial[];
+  resumo: string | null;
+  pastor_id: string | null;
   ativa: boolean;
 }
 
@@ -60,6 +63,11 @@ interface Instituicao {
   permite_integracao: boolean;
 }
 
+interface PessoaOption {
+  id: string;
+  nome_completo: string;
+}
+
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const PLATAFORMAS = [
@@ -85,15 +93,69 @@ const plataformaLabel = (v: string) =>
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Normaliza URL: lowercase, sem espaços, sem barra final */
 function normalizarSite(url: string): string {
   return url.trim().toLowerCase().replace(/\/+$/, "");
 }
 
-/** Valida se URL começa com http:// ou https:// */
 function validarUrl(url: string): boolean {
-  if (!url) return true; // opcional
+  if (!url) return true;
   return /^https?:\/\/.+\..+/.test(url.trim());
+}
+
+/**
+ * Gera um resumo institucional a partir dos dados disponíveis.
+ * Ponto de integração: substitua este bloco por uma chamada real
+ * à API de IA (Anthropic, OpenAI, Gemini) via Supabase Edge Function.
+ */
+function gerarResumoIA(params: {
+  nome: string;
+  missao: string;
+  visao: string;
+  site: string;
+  denominacao: string;
+  pastor: string;
+  fundadaEm: string;
+}): string {
+  const { nome, missao, visao, site, denominacao, pastor, fundadaEm } = params;
+  const ano = fundadaEm ? new Date(fundadaEm).getFullYear() : null;
+
+  const partes: string[] = [];
+
+  // Apresentação
+  if (nome) {
+    let intro = `A ${nome}`;
+    if (ano) intro += `, fundada em ${ano},`;
+    if (denominacao) intro += ` é uma igreja ${denominacao.toLowerCase()}`;
+    else intro += " é uma comunidade cristã";
+    intro += " comprometida com o crescimento espiritual e o serviço ao próximo.";
+    partes.push(intro);
+  }
+
+  // Missão
+  if (missao) {
+    partes.push(`Sua missão: ${missao.trim().replace(/\.$/, "")}.`);
+  }
+
+  // Visão
+  if (visao) {
+    partes.push(`Visão: ${visao.trim().replace(/\.$/, "")}.`);
+  }
+
+  // Pastor
+  if (pastor) {
+    partes.push(`Sob a liderança pastoral de ${pastor}, a igreja busca impactar vidas por meio do evangelho.`);
+  }
+
+  // Site
+  if (site) {
+    partes.push(`Saiba mais em ${site}.`);
+  }
+
+  if (partes.length === 0) {
+    return "Preencha os campos Nome, Missão e Visão para gerar um resumo automaticamente.";
+  }
+
+  return partes.join(" ");
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -113,10 +175,23 @@ export default function IdentidadeAdmin() {
     missao: "",
     visao: "",
     fundada_em: "",
+    resumo: "",
     slug: "",
     logo_url: "",
     site_oficial: "",
   });
+
+  // Pastor
+  const [pastorId, setPastorId] = useState<string>("");
+  const [pastorBusca, setPastorBusca] = useState("");
+  const [pastorNome, setPastorNome] = useState("");
+  const [pastorOpcoes, setPastorOpcoes] = useState<PessoaOption[]>([]);
+  const [showPastorDrop, setShowPastorDrop] = useState(false);
+  const pastorDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pastorRef = useRef<HTMLDivElement>(null);
+
+  // Resumo IA
+  const [gerandoResumo, setGerandoResumo] = useState(false);
 
   // Valores institucionais
   const [valores, setValores] = useState<ValorItem[]>([]);
@@ -141,6 +216,17 @@ export default function IdentidadeAdmin() {
   // ── Guarda de acesso ──
   useEffect(() => {
     if (!hasRole(["admin", "secretaria"])) navigate("/", { replace: true });
+  }, []);
+
+  // ── Fechar dropdown pastor ao clicar fora ──
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (pastorRef.current && !pastorRef.current.contains(e.target as Node)) {
+        setShowPastorDrop(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   // ── Carga ──
@@ -168,6 +254,7 @@ export default function IdentidadeAdmin() {
         missao:       ident.missao        ?? "",
         visao:        ident.visao         ?? "",
         fundada_em:   ident.fundada_em    ?? "",
+        resumo:       ident.resumo        ?? "",
         slug:         ident.slug          ?? "",
         logo_url:     ident.logo_url      ?? "",
         site_oficial: ident.site_oficial  ?? "",
@@ -178,6 +265,18 @@ export default function IdentidadeAdmin() {
           : []
       );
 
+      // Pastor
+      if (ident.pastor_id) {
+        setPastorId(ident.pastor_id);
+        const { data: p } = await supabase
+          .from("membros")
+          .select("id, nome_completo")
+          .eq("id", ident.pastor_id)
+          .maybeSingle();
+        if (p) { setPastorNome((p as any).nome_completo); setPastorBusca((p as any).nome_completo); }
+      }
+
+      // Valores
       const { data: vals } = await supabase
         .from("identidade_valores")
         .select("*")
@@ -190,6 +289,7 @@ export default function IdentidadeAdmin() {
         }))
       );
 
+      // Vínculos institucionais
       const { data: vins } = await supabase
         .from("igreja_instituicoes")
         .select("instituicao_id")
@@ -201,6 +301,64 @@ export default function IdentidadeAdmin() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // ── Pastor autocomplete ──
+  const buscarPastor = (q: string) => {
+    setPastorBusca(q);
+    setPastorId("");
+    setPastorNome("");
+    if (pastorDebounce.current) clearTimeout(pastorDebounce.current);
+    if (!q.trim()) { setPastorOpcoes([]); setShowPastorDrop(false); return; }
+    pastorDebounce.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from("membros")
+        .select("id, nome_completo")
+        .eq("tipo_pessoa", "membro")
+        .ilike("nome_completo", `%${q}%`)
+        .order("nome_completo")
+        .limit(8);
+      setPastorOpcoes((data ?? []) as PessoaOption[]);
+      setShowPastorDrop(true);
+    }, 350);
+  };
+
+  const selecionarPastor = (p: PessoaOption) => {
+    setPastorId(p.id);
+    setPastorNome(p.nome_completo);
+    setPastorBusca(p.nome_completo);
+    setPastorOpcoes([]);
+    setShowPastorDrop(false);
+  };
+
+  // ── Gerar resumo com IA (template inteligente) ──
+  const gerarResumo = async () => {
+    setGerandoResumo(true);
+
+    // Buscar denominação vinculada (se houver)
+    let denominacao = "";
+    if (vinculadas.size > 0) {
+      const firstId = Array.from(vinculadas)[0];
+      const inst = todasInstituicoes.find((i) => i.id === firstId);
+      if (inst) denominacao = inst.nome;
+    }
+
+    // Simula delay de processamento (substituir por chamada real à API de IA)
+    await new Promise((r) => setTimeout(r, 1200));
+
+    const texto = gerarResumoIA({
+      nome:        form.nome_igreja,
+      missao:      form.missao,
+      visao:       form.visao,
+      site:        form.site_oficial,
+      denominacao,
+      pastor:      pastorNome,
+      fundadaEm:   form.fundada_em,
+    });
+
+    setForm((p) => ({ ...p, resumo: texto }));
+    setGerandoResumo(false);
+    toast.success("Resumo gerado! Você pode editar antes de salvar.");
+  };
 
   // ── Valores ──
   const addValor = () =>
@@ -215,14 +373,10 @@ export default function IdentidadeAdmin() {
     );
 
   // ── Redes sociais ──
-  const addRede = () =>
-    setRedes((p) => [...p, { plataforma: "instagram", url: "" }]);
-
+  const addRede = () => setRedes((p) => [...p, { plataforma: "instagram", url: "" }]);
   const updateRede = (idx: number, field: keyof RedeSocial, value: string) =>
     setRedes((p) => p.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
-
-  const removeRede = (idx: number) =>
-    setRedes((p) => p.filter((_, i) => i !== idx));
+  const removeRede = (idx: number) => setRedes((p) => p.filter((_, i) => i !== idx));
 
   // ── Instituições ──
   const toggleInst = (id: string) =>
@@ -232,7 +386,6 @@ export default function IdentidadeAdmin() {
       return next;
     });
 
-  /** Busca sugestões de similaridade ao digitar no formulário de nova inst */
   const buscarSugestoes = (nome: string, site: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!nome.trim() && !site.trim()) { setSugestoes([]); return; }
@@ -268,40 +421,23 @@ export default function IdentidadeAdmin() {
 
   const criarInstPersonalizada = async () => {
     if (!novaInst.nome.trim()) { toast.error("Nome é obrigatório"); return; }
-
-    // Validar site se informado
     if (novaInst.site_oficial.trim() && !validarUrl(novaInst.site_oficial)) {
       setErroSiteInst("Informe um site válido. Exemplo: https://exemplo.com");
       return;
     }
-
-    const siteNorm = novaInst.site_oficial.trim()
-      ? normalizarSite(novaInst.site_oficial)
-      : null;
-
+    const siteNorm = novaInst.site_oficial.trim() ? normalizarSite(novaInst.site_oficial) : null;
     const { data, error } = await supabase
       .from("instituicoes")
       .insert({
-        nome:               novaInst.nome.trim(),
-        sigla:              novaInst.sigla.trim() || null,
-        site_oficial:       siteNorm,
-        tipo_instituicao:   novaInst.tipo_instituicao,
-        permite_integracao: false,
-        oficial:            false,
-        ativo:              true,
+        nome: novaInst.nome.trim(), sigla: novaInst.sigla.trim() || null,
+        site_oficial: siteNorm, tipo_instituicao: novaInst.tipo_instituicao,
+        permite_integracao: false, oficial: false, ativo: true,
       })
-      .select("id")
-      .single();
-
+      .select("id").single();
     if (error) {
-      if (error.code === "23505") {
-        toast.error("Já existe uma instituição com esse site cadastrado.");
-      } else {
-        toast.error(error.message);
-      }
+      toast.error(error.code === "23505" ? "Já existe uma instituição com esse site." : error.message);
       return;
     }
-
     await load();
     setVinculadas((prev) => new Set([...prev, (data as any).id]));
     setNovaInst({ nome: "", sigla: "", site_oficial: "", tipo_instituicao: "outro" });
@@ -319,6 +455,7 @@ export default function IdentidadeAdmin() {
     const payload: any = { ...form };
     Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
     payload.redes_sociais = redesAtivas.map(({ plataforma, url }) => ({ plataforma, url }));
+    payload.pastor_id = pastorId || null;
 
     let igrejId = identidade?.id ?? null;
 
@@ -336,10 +473,7 @@ export default function IdentidadeAdmin() {
 
     // Valores
     for (const v of valores) {
-      if (v._delete && v.id) {
-        await supabase.from("identidade_valores").delete().eq("id", v.id);
-        continue;
-      }
+      if (v._delete && v.id) { await supabase.from("identidade_valores").delete().eq("id", v.id); continue; }
       if (v._delete || !v.valor.trim()) continue;
       if (v.id) {
         await supabase.from("identidade_valores")
@@ -351,19 +485,16 @@ export default function IdentidadeAdmin() {
       }
     }
 
-    // Instituições: recalcular vínculos
-    const { data: atuais } = await supabase
-      .from("igreja_instituicoes").select("instituicao_id").eq("igreja_id", igrejId);
+    // Vínculos institucionais
+    const { data: atuais } = await supabase.from("igreja_instituicoes").select("instituicao_id").eq("igreja_id", igrejId);
     const atuaisSet = new Set((atuais ?? []).map((a: any) => a.instituicao_id));
-
     for (const id of vinculadas) {
       if (!atuaisSet.has(id))
         await supabase.from("igreja_instituicoes").insert({ igreja_id: igrejId, instituicao_id: id });
     }
     for (const id of atuaisSet) {
       if (!vinculadas.has(id))
-        await supabase.from("igreja_instituicoes")
-          .delete().eq("igreja_id", igrejId).eq("instituicao_id", id);
+        await supabase.from("igreja_instituicoes").delete().eq("igreja_id", igrejId).eq("instituicao_id", id);
     }
 
     setSaving(false);
@@ -380,9 +511,9 @@ export default function IdentidadeAdmin() {
     );
   }
 
-  const instOficiais     = todasInstituicoes.filter((i) => i.oficial);
-  const instPersonaliz   = todasInstituicoes.filter((i) => !i.oficial);
-  const isAdmin          = hasRole(["admin"]);
+  const instOficiais   = todasInstituicoes.filter((i) => i.oficial);
+  const instPersonaliz = todasInstituicoes.filter((i) => !i.oficial);
+  const isAdmin        = hasRole(["admin"]);
 
   return (
     <div>
@@ -399,352 +530,57 @@ export default function IdentidadeAdmin() {
 
       <div className="p-4 md:p-8 space-y-6 max-w-2xl">
 
-        {/* ── 1. Dados da Igreja ── */}
+        {/* ── 1. Dados Institucionais ── */}
         <Card className="shadow-card-soft">
           <CardHeader className="pb-3">
             <CardTitle className="font-serif flex items-center gap-2 text-lg">
-              <Church className="w-4 h-4 text-gold" /> Dados da Igreja
+              <Church className="w-4 h-4 text-gold" /> Dados Institucionais
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+
+            {/* Nome */}
             <div>
               <Label>Nome da Igreja *</Label>
-              <Input value={form.nome_igreja} onChange={(e) => setForm({ ...form, nome_igreja: e.target.value })}
+              <Input value={form.nome_igreja}
+                onChange={(e) => setForm({ ...form, nome_igreja: e.target.value })}
                 placeholder="Ex: Quarta Igreja Batista do Rio de Janeiro" />
             </div>
+
+            {/* CNPJ + Fundada em */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>CNPJ</Label>
-                <Input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
+                <Input value={form.cnpj}
+                  onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
                   placeholder="00.000.000/0001-00" />
               </div>
               <div>
                 <Label>Fundada em</Label>
-                <Input type="date" value={form.fundada_em} onChange={(e) => setForm({ ...form, fundada_em: e.target.value })} />
+                <Input type="date" value={form.fundada_em}
+                  onChange={(e) => setForm({ ...form, fundada_em: e.target.value })} />
               </div>
             </div>
+
+            {/* Missão */}
             <div>
               <Label>Missão</Label>
               <Textarea rows={3} value={form.missao}
                 onChange={(e) => setForm({ ...form, missao: e.target.value })}
                 placeholder="A missão da nossa igreja é…" className="resize-none" />
             </div>
+
+            {/* Visão */}
             <div>
               <Label>Visão</Label>
               <Textarea rows={3} value={form.visao}
                 onChange={(e) => setForm({ ...form, visao: e.target.value })}
                 placeholder="Nossa visão é ser uma igreja que…" className="resize-none" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Slug (URL amigável)</Label>
-                <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="qibrj" />
-              </div>
-              <div>
-                <Label>URL do Logo</Label>
-                <Input value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} placeholder="https://…" />
-              </div>
-            </div>
           </CardContent>
         </Card>
 
-        {/* ── 2. Identidade Digital ── */}
-        <Card className="shadow-card-soft">
-          <CardHeader className="pb-3">
-            <CardTitle className="font-serif flex items-center gap-2 text-lg">
-              <Globe className="w-4 h-4 text-gold" /> Identidade Digital
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-2 rounded-md bg-muted/50 border px-3 py-2.5">
-              <Info className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Centralize aqui os canais oficiais da igreja. Essas informações serão
-                usadas em relatórios, comunicados e no futuro portal da congregação.
-              </p>
-            </div>
-
-            {/* Site oficial */}
-            <div>
-              <Label className="flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" /> Site Oficial</Label>
-              <Input value={form.site_oficial}
-                onChange={(e) => setForm({ ...form, site_oficial: e.target.value })}
-                placeholder="https://www.suaigreja.com.br" />
-            </div>
-
-            {/* Redes sociais */}
-            <div>
-              <Label className="flex items-center gap-1.5 mb-2"><Link className="w-3.5 h-3.5" /> Redes Sociais</Label>
-
-              {redes.length === 0 && (
-                <p className="text-xs text-muted-foreground mb-2">Nenhuma rede social cadastrada.</p>
-              )}
-
-              <div className="space-y-2">
-                {redes.map((r, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <Select value={r.plataforma} onValueChange={(v) => updateRede(idx, "plataforma", v)}>
-                      <SelectTrigger className="w-36 shrink-0">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PLATAFORMAS.map((p) => (
-                          <SelectItem key={p.value} value={p.value}>
-                            {p.icon} {p.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      className="flex-1"
-                      value={r.url}
-                      onChange={(e) => updateRede(idx, "url", e.target.value)}
-                      placeholder={`URL ou @usuário do ${plataformaLabel(r.plataforma).label}`}
-                    />
-                    <button type="button" onClick={() => removeRede(idx)}
-                      className="w-8 h-8 flex items-center justify-center rounded hover:bg-destructive/10 shrink-0">
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <Button type="button" variant="outline" className="w-full border-dashed gap-2 mt-2"
-                onClick={addRede}>
-                <Plus className="w-4 h-4" /> Adicionar rede social
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── 3. Vínculos Institucionais ── */}
-        <Card className="shadow-card-soft">
-          <CardHeader className="pb-3">
-            <CardTitle className="font-serif flex items-center gap-2 text-lg">
-              <Building2 className="w-4 h-4 text-gold" /> Vínculos Institucionais
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-2 rounded-md bg-muted/50 border px-3 py-2.5">
-              <Info className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Marque as convenções, juntas e entidades às quais a igreja é filiada.
-                Instituições com <Zap className="inline w-3 h-3 text-amber-500" /> permitem integração futura com agenda.
-              </p>
-            </div>
-
-            {/* Instituições oficiais */}
-            {instOficiais.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Oficiais</p>
-                {instOficiais.map((inst) => (
-                  <label
-                    key={inst.id}
-                    className="flex items-start gap-3 rounded-md border px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors"
-                  >
-                    <Checkbox
-                      checked={vinculadas.has(inst.id)}
-                      onCheckedChange={() => toggleInst(inst.id)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium leading-tight">{inst.nome}</p>
-                        {inst.sigla && (
-                          <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{inst.sigla}</span>
-                        )}
-                        {inst.permite_integracao && (
-                          <span title="Permite integração com agenda">
-                            <Zap className="w-3 h-3 text-amber-500" />
-                          </span>
-                        )}
-                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
-                          {TIPOS_INSTITUICAO[inst.tipo_instituicao] ?? inst.tipo_instituicao}
-                        </Badge>
-                      </div>
-                      {inst.site_oficial && (
-                        <a
-                          href={inst.site_oficial}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-0.5"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          Visitar site
-                        </a>
-                      )}
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
-
-            {/* Instituições personalizadas */}
-            {instPersonaliz.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Personalizadas</p>
-                {instPersonaliz.map((inst) => (
-                  <label
-                    key={inst.id}
-                    className="flex items-start gap-3 rounded-md border px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors"
-                  >
-                    <Checkbox
-                      checked={vinculadas.has(inst.id)}
-                      onCheckedChange={() => toggleInst(inst.id)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium leading-tight">{inst.nome}</p>
-                        {inst.sigla && (
-                          <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{inst.sigla}</span>
-                        )}
-                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
-                          {TIPOS_INSTITUICAO[inst.tipo_instituicao] ?? inst.tipo_instituicao}
-                        </Badge>
-                      </div>
-                      {inst.site_oficial && (
-                        <a
-                          href={inst.site_oficial}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-0.5"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          Visitar site
-                        </a>
-                      )}
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
-
-            {/* Formulário de nova instituição personalizada — apenas admin */}
-            {isAdmin && (
-              adicionandoInst ? (
-                <div className="rounded-md border p-4 space-y-3 bg-muted/20">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Nova instituição personalizada
-                  </p>
-
-                  {/* Sugestões de duplicidade */}
-                  {sugestoes.length > 0 && (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        Encontramos instituições similares — selecione uma existente:
-                      </div>
-                      {sugestoes.map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => selecionarSugestao(s)}
-                          className="w-full flex items-center gap-2 text-left rounded-md border bg-background px-3 py-2 hover:bg-muted/60 transition-colors"
-                        >
-                          <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{s.nome}</p>
-                            {s.site_oficial && (
-                              <p className="text-[11px] text-muted-foreground truncate">{s.site_oficial}</p>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                      <p className="text-[11px] text-muted-foreground">
-                        Ou continue abaixo para criar uma nova mesmo assim.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Campo: Nome */}
-                  <div>
-                    <Label className="text-xs">Nome da instituição *</Label>
-                    <Input
-                      value={novaInst.nome}
-                      onChange={(e) => handleNovaInstNome(e.target.value)}
-                      placeholder="Ex: Convenção Batista Brasileira"
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {/* Sigla + Tipo */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">Sigla</Label>
-                      <Input
-                        value={novaInst.sigla}
-                        onChange={(e) => setNovaInst((p) => ({ ...p, sigla: e.target.value }))}
-                        placeholder="Ex: CBB"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Tipo</Label>
-                      <Select
-                        value={novaInst.tipo_instituicao}
-                        onValueChange={(v) => setNovaInst((p) => ({ ...p, tipo_instituicao: v }))}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(TIPOS_INSTITUICAO).map(([val, lbl]) => (
-                            <SelectItem key={val} value={val}>{lbl}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Site oficial */}
-                  <div>
-                    <Label className="text-xs">Site oficial (recomendado)</Label>
-                    <Input
-                      value={novaInst.site_oficial}
-                      onChange={(e) => handleNovaInstSite(e.target.value)}
-                      placeholder="https://convencaobatista.com.br"
-                      className={`mt-1 ${erroSiteInst ? "border-destructive" : ""}`}
-                    />
-                    {erroSiteInst && (
-                      <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> {erroSiteInst}
-                      </p>
-                    )}
-                    {buscandoSugestoes && (
-                      <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Verificando duplicidade…
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2 pt-1">
-                    <Button size="sm" onClick={criarInstPersonalizada} disabled={!novaInst.nome.trim()}>
-                      Adicionar
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => {
-                      setAdicionandoInst(false);
-                      setNovaInst({ nome: "", sigla: "", site_oficial: "", tipo_instituicao: "outro" });
-                      setSugestoes([]);
-                      setErroSiteInst("");
-                    }}>
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button type="button" variant="outline" className="w-full border-dashed gap-2"
-                  onClick={() => setAdicionandoInst(true)}>
-                  <Plus className="w-4 h-4" /> Adicionar instituição personalizada
-                </Button>
-              )
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ── 4. Valores Institucionais ── */}
+        {/* ── 2. Valores Institucionais ── */}
         <Card className="shadow-card-soft">
           <CardHeader className="pb-3">
             <CardTitle className="font-serif flex items-center gap-2 text-lg">
@@ -755,16 +591,12 @@ export default function IdentidadeAdmin() {
             <div className="flex items-start gap-2 rounded-md bg-muted/50 border px-3 py-2.5">
               <Info className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Os valores representam os princípios fundamentais da igreja e podem ser
-                adicionados, editados ou removidos livremente. Use o campo de ícone (emoji)
-                para identificar visualmente cada valor.
+                Princípios fundamentais da igreja. Use emoji no campo de ícone para identificar visualmente.
               </p>
             </div>
 
             {valores.filter((v) => !v._delete).length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-3">
-                Nenhum valor cadastrado ainda.
-              </p>
+              <p className="text-sm text-muted-foreground text-center py-3">Nenhum valor cadastrado ainda.</p>
             ) : (
               <div className="space-y-3">
                 {valores.map((v, idx) => {
@@ -792,6 +624,340 @@ export default function IdentidadeAdmin() {
             <Button type="button" variant="outline" className="w-full border-dashed gap-2" onClick={addValor}>
               <Plus className="w-4 h-4" /> Adicionar valor
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* ── 3. Resumo da Igreja ── */}
+        <Card className="shadow-card-soft">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-serif flex items-center gap-2 text-lg">
+              <Sparkles className="w-4 h-4 text-gold" /> Resumo da Igreja
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-start gap-2 rounded-md bg-muted/50 border px-3 py-2.5">
+              <Info className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Apresentação institucional da igreja usada em relatórios e comunicações.
+                Gere automaticamente a partir dos dados cadastrados ou escreva manualmente.
+              </p>
+            </div>
+
+            <Textarea
+              rows={5}
+              value={form.resumo}
+              onChange={(e) => setForm({ ...form, resumo: e.target.value })}
+              placeholder="Breve apresentação da igreja, missão, atuação e contexto…"
+              className="resize-none"
+            />
+
+            {isAdmin && (
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2 border-gold/40 text-gold hover:bg-gold/5 hover:border-gold"
+                onClick={gerarResumo}
+                disabled={gerandoResumo}
+              >
+                {gerandoResumo
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Gerando resumo…</>
+                  : <><Sparkles className="w-4 h-4" /> Gerar resumo automaticamente</>
+                }
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── 4. Pastor Titular ── */}
+        <Card className="shadow-card-soft">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-serif flex items-center gap-2 text-lg">
+              <User className="w-4 h-4 text-gold" /> Pastor Titular
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-start gap-2 rounded-md bg-muted/50 border px-3 py-2.5">
+              <Info className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Selecione o pastor titular a partir das pessoas cadastradas no sistema.
+              </p>
+            </div>
+
+            <div ref={pastorRef} className="relative">
+              <Label>Nome do Pastor Titular</Label>
+              <div className="relative mt-1">
+                <Input
+                  value={pastorBusca}
+                  onChange={(e) => buscarPastor(e.target.value)}
+                  onFocus={() => pastorBusca && setShowPastorDrop(true)}
+                  placeholder="Digite para buscar pelo nome…"
+                />
+                {pastorId && (
+                  <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                )}
+              </div>
+
+              {showPastorDrop && pastorOpcoes.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 rounded-md border bg-background shadow-elevated">
+                  {pastorOpcoes.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/60 transition-colors text-sm"
+                      onMouseDown={(e) => { e.preventDefault(); selecionarPastor(p); }}
+                    >
+                      <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      {p.nome_completo}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {pastorId && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Vinculado ao cadastro de pessoas
+                </p>
+              )}
+
+              {pastorBusca && !pastorId && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground mt-1 underline underline-offset-2"
+                  onClick={() => { setPastorBusca(""); setPastorId(""); setPastorNome(""); setPastorOpcoes([]); }}
+                >
+                  Limpar seleção
+                </button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── 5. Identidade Digital ── */}
+        <Card className="shadow-card-soft">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-serif flex items-center gap-2 text-lg">
+              <Globe className="w-4 h-4 text-gold" /> Identidade Digital
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-2 rounded-md bg-muted/50 border px-3 py-2.5">
+              <Info className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Canais oficiais da igreja usados em relatórios e comunicados.
+              </p>
+            </div>
+
+            {/* Slug + Logo */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Slug (URL amigável)</Label>
+                <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="qibrj" />
+              </div>
+              <div>
+                <Label>URL do Logo</Label>
+                <Input value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} placeholder="https://…" />
+              </div>
+            </div>
+
+            {/* Site oficial */}
+            <div>
+              <Label className="flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" /> Site Oficial</Label>
+              <Input value={form.site_oficial}
+                onChange={(e) => setForm({ ...form, site_oficial: e.target.value })}
+                placeholder="https://www.suaigreja.com.br" />
+            </div>
+
+            {/* Redes sociais */}
+            <div>
+              <Label className="flex items-center gap-1.5 mb-2"><Link className="w-3.5 h-3.5" /> Redes Sociais</Label>
+              {redes.length === 0 && (
+                <p className="text-xs text-muted-foreground mb-2">Nenhuma rede social cadastrada.</p>
+              )}
+              <div className="space-y-2">
+                {redes.map((r, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Select value={r.plataforma} onValueChange={(v) => updateRede(idx, "plataforma", v)}>
+                      <SelectTrigger className="w-36 shrink-0"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {PLATAFORMAS.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>{p.icon} {p.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input className="flex-1" value={r.url}
+                      onChange={(e) => updateRede(idx, "url", e.target.value)}
+                      placeholder={`URL ou @usuário do ${plataformaLabel(r.plataforma).label}`}
+                    />
+                    <button type="button" onClick={() => removeRede(idx)}
+                      className="w-8 h-8 flex items-center justify-center rounded hover:bg-destructive/10 shrink-0">
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <Button type="button" variant="outline" className="w-full border-dashed gap-2 mt-2" onClick={addRede}>
+                <Plus className="w-4 h-4" /> Adicionar rede social
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── 6. Vínculos Institucionais ── */}
+        <Card className="shadow-card-soft">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-serif flex items-center gap-2 text-lg">
+              <Building2 className="w-4 h-4 text-gold" /> Vínculos Institucionais
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-2 rounded-md bg-muted/50 border px-3 py-2.5">
+              <Info className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Convenções, juntas e entidades às quais a igreja é filiada.
+                Instituições com <Zap className="inline w-3 h-3 text-amber-500" /> permitem integração futura com agenda.
+              </p>
+            </div>
+
+            {instOficiais.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Oficiais</p>
+                {instOficiais.map((inst) => (
+                  <label key={inst.id}
+                    className="flex items-start gap-3 rounded-md border px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors">
+                    <Checkbox checked={vinculadas.has(inst.id)} onCheckedChange={() => toggleInst(inst.id)} className="mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium leading-tight">{inst.nome}</p>
+                        {inst.sigla && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{inst.sigla}</span>}
+                        {inst.permite_integracao && <Zap className="w-3 h-3 text-amber-500" title="Permite integração com agenda" />}
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
+                          {TIPOS_INSTITUICAO[inst.tipo_instituicao] ?? inst.tipo_instituicao}
+                        </Badge>
+                      </div>
+                      {inst.site_oficial && (
+                        <a href={inst.site_oficial} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-0.5"
+                          onClick={(e) => e.stopPropagation()}>
+                          <ExternalLink className="w-3 h-3" /> Visitar site
+                        </a>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {instPersonaliz.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Personalizadas</p>
+                {instPersonaliz.map((inst) => (
+                  <label key={inst.id}
+                    className="flex items-start gap-3 rounded-md border px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors">
+                    <Checkbox checked={vinculadas.has(inst.id)} onCheckedChange={() => toggleInst(inst.id)} className="mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium leading-tight">{inst.nome}</p>
+                        {inst.sigla && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{inst.sigla}</span>}
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
+                          {TIPOS_INSTITUICAO[inst.tipo_instituicao] ?? inst.tipo_instituicao}
+                        </Badge>
+                      </div>
+                      {inst.site_oficial && (
+                        <a href={inst.site_oficial} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-0.5"
+                          onClick={(e) => e.stopPropagation()}>
+                          <ExternalLink className="w-3 h-3" /> Visitar site
+                        </a>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {isAdmin && (
+              adicionandoInst ? (
+                <div className="rounded-md border p-4 space-y-3 bg-muted/20">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nova instituição personalizada</p>
+
+                  {sugestoes.length > 0 && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="w-3.5 h-3.5" /> Encontramos instituições similares:
+                      </div>
+                      {sugestoes.map((s) => (
+                        <button key={s.id} type="button" onClick={() => selecionarSugestao(s)}
+                          className="w-full flex items-center gap-2 text-left rounded-md border bg-background px-3 py-2 hover:bg-muted/60 transition-colors">
+                          <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{s.nome}</p>
+                            {s.site_oficial && <p className="text-[11px] text-muted-foreground truncate">{s.site_oficial}</p>}
+                          </div>
+                        </button>
+                      ))}
+                      <p className="text-[11px] text-muted-foreground">Ou continue abaixo para criar uma nova.</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <Label className="text-xs">Nome da instituição *</Label>
+                    <Input value={novaInst.nome} onChange={(e) => handleNovaInstNome(e.target.value)}
+                      placeholder="Ex: Convenção Batista Brasileira" className="mt-1" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Sigla</Label>
+                      <Input value={novaInst.sigla} onChange={(e) => setNovaInst((p) => ({ ...p, sigla: e.target.value }))}
+                        placeholder="Ex: CBB" className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Tipo</Label>
+                      <Select value={novaInst.tipo_instituicao} onValueChange={(v) => setNovaInst((p) => ({ ...p, tipo_instituicao: v }))}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(TIPOS_INSTITUICAO).map(([val, lbl]) => (
+                            <SelectItem key={val} value={val}>{lbl}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs">Site oficial (recomendado)</Label>
+                    <Input value={novaInst.site_oficial} onChange={(e) => handleNovaInstSite(e.target.value)}
+                      placeholder="https://convencaobatista.com.br"
+                      className={`mt-1 ${erroSiteInst ? "border-destructive" : ""}`} />
+                    {erroSiteInst && (
+                      <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> {erroSiteInst}
+                      </p>
+                    )}
+                    {buscandoSugestoes && (
+                      <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Verificando duplicidade…
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" onClick={criarInstPersonalizada} disabled={!novaInst.nome.trim()}>Adicionar</Button>
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setAdicionandoInst(false);
+                      setNovaInst({ nome: "", sigla: "", site_oficial: "", tipo_instituicao: "outro" });
+                      setSugestoes([]);
+                      setErroSiteInst("");
+                    }}>Cancelar</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button type="button" variant="outline" className="w-full border-dashed gap-2"
+                  onClick={() => setAdicionandoInst(true)}>
+                  <Plus className="w-4 h-4" /> Adicionar instituição personalizada
+                </Button>
+              )
+            )}
           </CardContent>
         </Card>
 
