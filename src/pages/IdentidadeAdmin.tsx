@@ -282,7 +282,6 @@ const [togglingStatus, setTogglingStatus] = useState(false);
       supabase
         .from("instituicoes")
         .select("*")
-        .eq("ativo", true)
         .order("oficial", { ascending: false })
         .order("nome"),
     ]);
@@ -505,7 +504,7 @@ const [togglingStatus, setTogglingStatus] = useState(false);
       .insert({
         nome: novaInst.nome.trim(), sigla: novaInst.sigla.trim() || null,
         site_oficial: siteNorm, tipo_instituicao: novaInst.tipo_instituicao,
-        permite_integracao: false, oficial: false, ativo: true,
+        permite_integracao: false, oficial: false,
       })
       .select("id").single();
     if (error) {
