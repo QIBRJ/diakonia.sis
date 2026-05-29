@@ -19,6 +19,7 @@ import {
   FileText,
   Upload,
   Download,
+  Flame,
 } from "lucide-react";
 import { BrandMark } from "@/components/Brand";
 import { useEffect } from "react";
@@ -54,6 +55,7 @@ const pageTitles: Record<string, string> = {
   "/admin/documentos": "Documentos Institucionais",
   "/admin/importacao": "Importação de Membros",
   "/admin/exportacao": "Exportação de Dados",
+  "/admin/campanhas": "Campanhas Espirituais",
 };
 
 export default function AppLayout() {
@@ -200,6 +202,19 @@ export default function AppLayout() {
             >
               <Download className="w-4 h-4" />
               <span translate="no">Exportação de Dados</span>
+            </NavLink>
+            <NavLink
+              to="/admin/campanhas"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-gold"
+                    : "hover:bg-sidebar-accent/60 text-sidebar-foreground/80"
+                }`
+              }
+            >
+              <Flame className="w-4 h-4" />
+              <span translate="no">Campanhas Espirituais</span>
             </NavLink>
           </div>
         )}

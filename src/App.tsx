@@ -21,6 +21,7 @@ import IdentidadeAdmin from "./pages/IdentidadeAdmin.tsx";
 import DocumentosAdmin from "./pages/DocumentosAdmin.tsx";
 import ImportacaoMembros from "./pages/ImportacaoMembros.tsx";
 import ExportacaoAdmin from "./pages/ExportacaoAdmin.tsx";
+import CampanhasAdmin from "./pages/CampanhasAdmin.tsx";
 import AgendaPrint from "./pages/AgendaPrint.tsx";
 import { AuthProvider } from "./hooks/useAuth.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
@@ -57,6 +58,7 @@ const App = () => (
                   <Route path="/admin/documentos" element={<DocumentosAdmin />} />
                   <Route path="/admin/importacao" element={<ImportacaoMembros />} />
                   <Route path="/admin/exportacao" element={<ExportacaoAdmin />} />
+                  <Route path="/admin/campanhas" element={<CampanhasAdmin />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
