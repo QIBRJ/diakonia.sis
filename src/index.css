@@ -4,11 +4,10 @@
 
 /*
  * DIAKONIA APP — Tema da Igreja
- * Paleta: Pinheiro (#4A6741) · Algodão Egípcio (#F5F3F0) · Rosa Queimado (#BE7060)
- * Conversões HSL:
- *   Pinheiro     → hsl(107 22% 33%)
- *   Algodão Egíp → hsl(36  20% 95%)
- *   Rosa Queimado→ hsl(12  42% 56%)
+ * Paleta: Dourado Cobre · Algodão Egípcio (#F5F3F0) · Rosa Queimado (#BE7060)
+ * Dourado Cobre ≈ #A87230 → hsl(30 62% 42%)
+ * Algodão Egípcio        → hsl(36 20% 95%)
+ * Rosa Queimado          → hsl(12 42% 56%)
  * Tema único — sem alternância claro/escuro.
  */
 
@@ -29,17 +28,17 @@
     --popover:            0 0% 100%;     /* branco puro em dropdowns     */
     --popover-foreground: 0 0% 15%;
 
-    /* ── Primário: Pinheiro (verde floresta) ──────────────────── */
-    --primary:            107 22% 33%;   /* ≈ #4A6741                    */
-    --primary-foreground: 36 20% 96%;   /* texto algodão sobre verde    */
-    --primary-glow:       107 25% 42%;  /* hover / glow mais claro      */
+    /* ── Primário: Dourado Cobre ──────────────────────────────── */
+    --primary:            30 62% 42%;    /* ≈ #A87230 — cobre quente     */
+    --primary-foreground: 36 20% 97%;   /* texto claro sobre o cobre    */
+    --primary-glow:       30 65% 52%;   /* hover / foco mais claro      */
 
-    /* ── Secundário: verde mais suave ────────────────────────── */
-    --secondary:          107 15% 88%;
-    --secondary-foreground: 107 22% 22%;
+    /* ── Secundário: cobre amuado claro ──────────────────────── */
+    --secondary:          30 20% 88%;
+    --secondary-foreground: 30 35% 25%;
 
     /* ── Muted / neutros quentes ─────────────────────────────── */
-    --muted:              36 15% 91%;    /* fundo neutro quente          */
+    --muted:              36 15% 91%;
     --muted-foreground:   0 0% 36%;      /* #5C5C5C — cinza médio        */
 
     /* ── Accent + Gold: Rosa Queimado (terracota) ─────────────── */
@@ -50,8 +49,8 @@
     --gold:               12 42% 56%;    /* ≈ #BE7060                    */
     --gold-foreground:    0 0% 100%;
 
-    /* ── Teal → verde-musgo complementar ─────────────────────── */
-    --teal:               142 25% 40%;
+    /* ── Teal → complementar âmbar quente ────────────────────── */
+    --teal:               38 45% 40%;
     --teal-foreground:    0 0% 100%;
 
     /* ── Feedback ────────────────────────────────────────────── */
@@ -65,30 +64,30 @@
     --destructive-foreground: 0 0% 100%;
 
     /* ── Estrutura ───────────────────────────────────────────── */
-    --border:             36 18% 84%;    /* borda quente e discreta      */
-    --input:              36 15% 92%;    /* fundo dos inputs             */
-    --ring:               107 22% 33%;   /* foco igual ao primary        */
+    --border:             36 18% 84%;
+    --input:              36 15% 92%;
+    --ring:               30 62% 42%;    /* foco igual ao primary        */
 
     --radius: 0.625rem;
 
     /* ── Gradientes ──────────────────────────────────────────── */
-    --gradient-hero:  linear-gradient(140deg, hsl(36 20% 97%) 0%, hsl(36 18% 93%) 55%, hsl(107 12% 86%) 100%);
+    --gradient-hero:  linear-gradient(140deg, hsl(36 20% 97%) 0%, hsl(36 18% 93%) 55%, hsl(30 18% 87%) 100%);
     --gradient-gold:  linear-gradient(135deg, hsl(12 46% 62%), hsl(12 38% 48%));
-    --gradient-verse: linear-gradient(135deg, hsl(36 20% 95%), hsl(107 10% 90%));
+    --gradient-verse: linear-gradient(135deg, hsl(36 20% 95%), hsl(30 12% 90%));
 
     /* ── Sombras ─────────────────────────────────────────────── */
-    --shadow-card:     0 1px 3px hsl(107 20% 15% / 0.08), 0 1px 2px hsl(107 20% 15% / 0.05);
-    --shadow-elevated: 0 16px 40px -12px hsl(107 20% 15% / 0.15);
+    --shadow-card:     0 1px 3px hsl(25 35% 18% / 0.09), 0 1px 2px hsl(25 35% 18% / 0.06);
+    --shadow-elevated: 0 16px 40px -12px hsl(25 35% 18% / 0.16);
     --shadow-gold:     0 8px 24px -8px hsl(12 42% 56% / 0.28);
 
-    /* ── Sidebar: fundo Pinheiro (verde floresta) ─────────────── */
-    --sidebar-background:        107 22% 28%;   /* verde escuro principal */
-    --sidebar-foreground:        36 20% 93%;    /* texto Algodão          */
-    --sidebar-primary:           12 42% 62%;    /* Rosa queimado + claro  */
+    /* ── Sidebar: fundo Dourado Cobre escuro (bronze) ─────────── */
+    --sidebar-background:        25 45% 28%;   /* bronze escuro ≈ #63381C  */
+    --sidebar-foreground:        36 20% 93%;   /* texto Algodão            */
+    --sidebar-primary:           12 42% 62%;   /* Rosa queimado + claro    */
     --sidebar-primary-foreground:0 0% 100%;
-    --sidebar-accent:            107 18% 35%;   /* hover: verde um pouco + claro */
+    --sidebar-accent:            25 40% 35%;   /* hover: bronze mais claro */
     --sidebar-accent-foreground: 36 20% 97%;
-    --sidebar-border:            107 20% 23%;   /* borda mais escura      */
+    --sidebar-border:            25 42% 22%;   /* borda mais escura        */
     --sidebar-ring:              12 42% 62%;
   }
 
@@ -102,18 +101,18 @@
     --card-foreground:    0 0% 15%;
     --popover:            0 0% 100%;
     --popover-foreground: 0 0% 15%;
-    --primary:            107 22% 33%;
-    --primary-foreground: 36 20% 96%;
-    --primary-glow:       107 25% 42%;
-    --secondary:          107 15% 88%;
-    --secondary-foreground: 107 22% 22%;
+    --primary:            30 62% 42%;
+    --primary-foreground: 36 20% 97%;
+    --primary-glow:       30 65% 52%;
+    --secondary:          30 20% 88%;
+    --secondary-foreground: 30 35% 25%;
     --muted:              36 15% 91%;
     --muted-foreground:   0 0% 36%;
     --accent:             12 42% 56%;
     --accent-foreground:  0 0% 100%;
     --gold:               12 42% 56%;
     --gold-foreground:    0 0% 100%;
-    --teal:               142 25% 40%;
+    --teal:               38 45% 40%;
     --teal-foreground:    0 0% 100%;
     --success:            142 52% 36%;
     --success-foreground: 0 0% 100%;
@@ -123,20 +122,20 @@
     --destructive-foreground: 0 0% 100%;
     --border:             36 18% 84%;
     --input:              36 15% 92%;
-    --ring:               107 22% 33%;
-    --gradient-hero:  linear-gradient(140deg, hsl(36 20% 97%) 0%, hsl(36 18% 93%) 55%, hsl(107 12% 86%) 100%);
+    --ring:               30 62% 42%;
+    --gradient-hero:  linear-gradient(140deg, hsl(36 20% 97%) 0%, hsl(36 18% 93%) 55%, hsl(30 18% 87%) 100%);
     --gradient-gold:  linear-gradient(135deg, hsl(12 46% 62%), hsl(12 38% 48%));
-    --gradient-verse: linear-gradient(135deg, hsl(36 20% 95%), hsl(107 10% 90%));
-    --shadow-card:     0 1px 3px hsl(107 20% 15% / 0.08), 0 1px 2px hsl(107 20% 15% / 0.05);
-    --shadow-elevated: 0 16px 40px -12px hsl(107 20% 15% / 0.15);
+    --gradient-verse: linear-gradient(135deg, hsl(36 20% 95%), hsl(30 12% 90%));
+    --shadow-card:     0 1px 3px hsl(25 35% 18% / 0.09), 0 1px 2px hsl(25 35% 18% / 0.06);
+    --shadow-elevated: 0 16px 40px -12px hsl(25 35% 18% / 0.16);
     --shadow-gold:     0 8px 24px -8px hsl(12 42% 56% / 0.28);
-    --sidebar-background:        107 22% 28%;
+    --sidebar-background:        25 45% 28%;
     --sidebar-foreground:        36 20% 93%;
     --sidebar-primary:           12 42% 62%;
     --sidebar-primary-foreground:0 0% 100%;
-    --sidebar-accent:            107 18% 35%;
+    --sidebar-accent:            25 40% 35%;
     --sidebar-accent-foreground: 36 20% 97%;
-    --sidebar-border:            107 20% 23%;
+    --sidebar-border:            25 42% 22%;
     --sidebar-ring:              12 42% 62%;
   }
 }
@@ -170,7 +169,6 @@
 
   h1, h2, h3, h4 { @apply font-serif tracking-tight; }
 
-  /* Seleção com Rosa Queimado */
   ::selection {
     background-color: hsl(12 42% 56% / 0.20);
     color: hsl(0 0% 15%);
@@ -190,18 +188,17 @@
    ════════════════════════════════════════════════════════════ */
 @layer utilities {
 
-  /* Scrollbar na paleta Pinheiro */
+  /* Scrollbar na paleta cobre */
   ::-webkit-scrollbar       { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: hsl(107 18% 65%);
+    background: hsl(30 40% 65%);
     border-radius: 99px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(107 22% 50%);
+    background: hsl(30 50% 50%);
   }
 
-  /* Gradiente Rosa Queimado */
   .text-gradient-gold {
     background: var(--gradient-gold);
     -webkit-background-clip: text;
@@ -209,7 +206,6 @@
     background-clip: text;
   }
 
-  /* Separador */
   .divider-gold {
     height: 1px;
     background: linear-gradient(to right, transparent, hsl(12 42% 56% / 0.35), transparent);
@@ -217,14 +213,12 @@
     margin: 1rem 0;
   }
 
-  /* Superfície glass */
   .surface-glass {
     background: hsl(36 18% 98% / 0.90);
     backdrop-filter: blur(8px);
     border: 1px solid hsl(36 18% 84% / 0.60);
   }
 
-  /* Animações */
   @keyframes fade-in {
     from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0);   }
