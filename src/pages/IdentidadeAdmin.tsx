@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import {
+import {h
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
@@ -945,8 +945,8 @@ export default function IdentidadeAdmin() {
                       <Select value={novoPastorForm.sexo} onValueChange={(v) => setNovoPastorForm(p => ({ ...p, sexo: v }))}>
                         <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="M">Masculino</SelectItem>
-                          <SelectItem value="F">Feminino</SelectItem>
+                          <SelectItem value="masculino">Masculino</SelectItem>
+                          <SelectItem value="feminino">Feminino</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
