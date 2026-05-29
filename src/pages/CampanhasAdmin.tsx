@@ -528,26 +528,55 @@ function WizardCampanha({ campanha, onClose, onSalvo }: {
       }
 
       // 2. Upload dos arquivos novos para storage
-      const materiaisSalvos: Material[] = [];
-      for (const m of materiais) {
-        if (!m.arquivo) continue; // já estava salvo
+    const materiaisSalvos: Material[] = [];
+    const BUCKET = "campanhas-materiais";
 
-        const path = `${campanhaId}/${Date.now()}-${m.nome_arquivo}`;
-        const { error: upErr } = await supabase.storage
-          .from("campanhas-materiais")
-          .upload(path, m.arquivo, { upsert: true });
+    if (materiais.some((m) => m.arquivo)) {
+      // Verificar se bucket existe; se não, criar automaticamente
+      try {
+        const { data: buckets } = await supabase.storage.listBuckets();
+        const bucketExiste = (buckets ?? []).some((b: any) => b.name === BUCKET);
+        if (!bucketExiste) {
+          const { error: createErr } = await supabase.storage.createBucket(BUCKET, { public: true });
+          if (createErr && !createErr.message?.includes("already exists")) {
+            console.warn("Aviso ao criar bucket:", createErr.message);
+          }
+        }
+      } catch (bucketCheckErr) {
+        console.warn("Não foi possível verificar bucket:", bucketCheckErr);
+      }
+    }
 
-        if (upErr) { console.warn("Upload falhou:", upErr.message); continue; }
+    for (const m of materiais) {
+      if (!m.arquivo) continue; // já estava salvo
 
-        const { data: urlData } = supabase.storage
-          .from("campanhas-materiais")
-          .getPublicUrl(path);
+      // Nome único com UUID para evitar colisões
+      const ext = m.nome_arquivo.split(".").pop() ?? "bin";
+      const uniqueName = `${crypto.randomUUID()}.${ext}`;
+      const path = `${campanhaId}/${uniqueName}`;
 
-        materiaisSalvos.push({
-          ...m,
-          storage_path: path,
-          url_publica:  urlData.publicUrl,
-        });
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, m.arquivo, { upsert: true, cacheControl: "3600" });
+
+      if (upErr) {
+        console.error("Upload falhou para", m.nome_arquivo, ":", upErr.message);
+        toast.error(`Erro ao enviar "${m.nome_arquivo}": ${upErr.message}`);
+        continue;
+      }
+
+      // URL pública (bucket público) — fallback para signed URL se privado
+      let urlFinal = "";
+      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      urlFinal = urlData.publicUrl;
+
+      materiaisSalvos.push({
+        ...m,
+        nome_arquivo: m.nome_arquivo,
+        storage_path: path,
+        url_publica: urlFinal,
+      });
+    }
       }
 
       // 3. Inserir materiais
@@ -714,12 +743,12 @@ function WizardCampanha({ campanha, onClose, onSalvo }: {
               {/* Origem: missão, visão ou valor */}
               <div>
                 <Label className="text-xs">Esta campanha está baseada em…</Label>
-                <Select value={form.origem_identidade} onValueChange={(v) => setForm({ ...form, origem_identidade: v, origem_valor_id: "" })}>
+                <Select value={form.origem_identidade} onValueChange={(v) => setForm({ ...form, origem_identidade: v === "none" ? "" : v, origem_valor_id: "" })}>
                   <SelectTrigger className="mt-1 h-8 text-sm">
                     <SelectValue placeholder="Selecionar origem (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">— Não definir —</SelectItem>
+                    <SelectItem value="none">— Não definir —</SelectItem>
                     <SelectItem value="missao">🎯 Missão da Igreja</SelectItem>
                     <SelectItem value="visao">👁 Visão da Igreja</SelectItem>
                     <SelectItem value="valor">💎 Valor Institucional</SelectItem>
