@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import type { Membro } from "@/pages/Membros";
+import { FamiliaSection } from "@/components/familias/FamiliaSection";
 
 // ── Opções "Como conheceu" ────────────────────────────────────────────────
 const COMO_CONHECEU_OPTS = [
@@ -540,7 +541,20 @@ export function MembroForm({ open, onOpenChange, membro, onSaved }: Props) {
               </>
             )}
 
-            {/* ── FOOTER ── */}
+            
+{/* ── FAMÍLIA ── */}
+{(isCongregado || isMembro) && membro && (
+  <div>
+    <h3 className="font-semibold text-sm text-muted-foreground" translate="no">Família</h3>
+    <FamiliaSection
+      pessoaId={membro.id}
+      pessoaNome={form.nome_completo}
+      readOnly={false}
+    />
+  </div>
+)}
+
+{/* ── FOOTER ── */}
             <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-2">
               {isAdmin && membro && (
                 <Button type="button" variant="destructive" className="sm:mr-auto gap-2"
