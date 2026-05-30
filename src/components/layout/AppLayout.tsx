@@ -22,7 +22,7 @@ import {
   Flame,
 } from "lucide-react";
 import { BrandMark } from "@/components/Brand";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { QuickActionsFab } from "@/components/QuickActionsFab";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { UserMenuButton } from "@/components/layout/UserMenuButton";
